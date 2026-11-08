@@ -5,6 +5,8 @@ const MAX_SLOTS = 16;
 export const FPS_CHOICES = [15, 24, 30, 60];
 const DEFAULT_GREEN_MIN = 0.02; // outline Discord yang asli tipis: hanya ~3% kotak deteksi yang hijau
 const num = v => Number.isFinite(v);
+// ukuran frame capture (px) tempat crop dibuat; 0 = belum diketahui (layout lama)
+const frameSize = v => (num(v) && v >= 16 && v <= 16384 ? Math.round(v) : 0);
 
 function rect(r) {
   return r && num(r.x) && num(r.y) && num(r.w) && num(r.h) && r.w > 0 && r.h > 0
@@ -63,11 +65,55 @@ function validatePresets(list) {
       id: p.id, name: typeof p.name === 'string' ? p.name.slice(0, 40) : '', slots,
       pinned: !!p.pinned, // disematkan: tampil sebagai tombol di bawah kanvas (sisanya di menu Lainnya)
       full: p.full !== false, // nama frame & akun Discord ikut tersimpan; preset lama selalu begitu
+      frameW: frameSize(p.frameW), frameH: frameSize(p.frameH), // ukuran capture saat preset disimpan
     });
     if (out.length >= 20) break;
   }
   return out;
 }
+
+// Daftar virtual frame tersimpan: frame dari gambar yang pernah dipakai tetap ada walau dihapus dari kanvas.
+const MAX_LIBRARY = 50;
+function validateLibrary(list) {
+  const out = [], ids = new Set();
+  for (const e of Array.isArray(list) ? list : []) {
+    const s = validateSlots([e])?.[0];
+    if (!s?.image || ids.has(s.id)) continue;
+    ids.add(s.id);
+    out.push(s);
+    if (out.length >= MAX_LIBRARY) break;
+  }
+  return out;
+}
+
+// Semua virtual frame yang dikenal, satu per id: dari daftar, preset, dan kanvas (data kanvas paling baru).
+// canvas: 'on' (tampil) | 'off' (tersembunyi) | null; presets = jumlah preset yang menyimpannya; saved = ada di daftar.
+export function virtualLibrary({ slots = [], library = [], presets = [] }) {
+  const m = new Map();
+  const at = s => { if (!m.has(s.id)) m.set(s.id, { slot: s, saved: false, canvas: null, presets: 0 }); return m.get(s.id); };
+  for (const s of library) at(s).saved = true;
+  for (const p of presets) for (const s of p.slots) if (s.image) at(s).presets++;
+  for (const s of slots) if (s.image) Object.assign(at(s), { slot: s, canvas: s.enabled ? 'on' : 'off' });
+  return [...m.values()];
+}
+
+// Simpan atau perbarui virtual frame di daftar (paling baru di depan). Slot asal tidak diubah.
+export const rememberVirtual = (library, s) => (s?.image
+  ? [{ ...structuredClone(s), enabled: true }, ...library.filter(x => x.id !== s.id)].slice(0, MAX_LIBRARY)
+  : library);
+
+// Hapus permanen: dari daftar dan dari semua preset; preset yang jadi kosong ikut hilang.
+export const forgetVirtual = ({ library, presets }, id) => ({
+  library: library.filter(x => x.id !== id),
+  presets: presets.map(p => ({ ...p, slots: p.slots.filter(s => s.id !== id) })).filter(p => p.slots.length),
+});
+
+// Virtual frame tanpa sumber bicara (mis. dari preset "susunan saja") memakai sumber yang diingat daftar.
+export const withVirtualSources = (slots, library) => slots.map(s => {
+  if (!s.image || s.discordId) return s;
+  const k = library.find(x => x.id === s.id && x.discordId);
+  return k ? { ...s, discordId: k.discordId, discordName: k.discordName, detect: true } : s;
+});
 
 // Urutan tombol preset: yang disematkan dulu, lalu urutan simpanan (bisa diubah dengan drag). Tidak bergeser karena dipakai.
 export const presetOrder = presets => [...presets].sort((a, b) => b.pinned - a.pinned);
@@ -118,6 +164,17 @@ export function mergeDraft(current, draftSlots, frame, canvas = { w: 1920, h: 10
   });
 }
 
+// Ukuran frame capture berubah (mis. jendela Discord pindah ke monitor beresolusi lain): crop, baseCrop, dan kotak deteksi
+// ikut diskalakan selama rasionya sama, karena Discord menskalakan isinya. Rasio berbeda (isi Discord tersusun ulang),
+// ukuran sama, atau ukuran lama tidak diketahui: slot dikembalikan apa adanya. Frame virtual tidak bergantung capture.
+export function rescaleSlots(slots, from, to) {
+  if (!from?.w || !from?.h || !to?.w || !to?.h || (from.w === to.w && from.h === to.h)) return slots;
+  if (Math.abs(from.w / from.h - to.w / to.h) > 0.01 * (to.w / to.h)) return slots;
+  const k = to.w / from.w;
+  const sc = r => ({ x: r.x * k, y: r.y * k, w: r.w * k, h: r.h * k });
+  return slots.map(s => (s.image ? s : { ...s, crop: sc(s.crop), baseCrop: sc(s.baseCrop ?? s.crop), probe: sc(s.probe) }));
+}
+
 export function validateLayout(l) {
   const slots = validateSlots(l?.slots);
   if (!slots) return null;
@@ -131,11 +188,13 @@ export function validateLayout(l) {
       // video ke OBS: bitrate maksimum encoder (Mbps) dan frame per detik capture
       bitrate: num(l.settings?.bitrate) ? Math.min(20, Math.max(2, Math.round(l.settings.bitrate))) : 8,
       fps: FPS_CHOICES.includes(l.settings?.fps) ? l.settings.fps : 30,
+      frameW: frameSize(l.settings?.frameW), frameH: frameSize(l.settings?.frameH), // ukuran capture tempat crop dibuat
     },
     style: validateStyle(l.style),
     template: TEMPLATES[l.template] ? l.template : l.style ? '' : DEFAULT_TEMPLATE,
     guides: validateGuides(l.guides),
     presets: validatePresets(l.presets),
+    library: validateLibrary(l.library),
   };
 }
 

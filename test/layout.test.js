@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateLayout, newSlot, newSlotFrom, nextSlotName, presetOrder, carryDiscordSlots, mergeDraft, presetSlots, applyPresetSlots } from '../public/shared/layout.js';
+import { validateLayout, newSlot, newSlotFrom, nextSlotName, presetOrder, carryDiscordSlots, mergeDraft, presetSlots, applyPresetSlots, virtualLibrary, rememberVirtual, forgetVirtual, withVirtualSources, rescaleSlots } from '../public/shared/layout.js';
 import { defaultStyle, TEMPLATES } from '../public/shared/style.js';
 
 test('nextSlotName: DC 1 untuk layout kosong, lalu nomor terkecil yang kosong', () => {
@@ -9,7 +9,7 @@ test('nextSlotName: DC 1 untuk layout kosong, lalu nomor terkecil yang kosong', 
   assert.equal(nextSlotName(named(['DC 1'])), 'DC 2');
   assert.equal(nextSlotName(named(['DC 1', 'DC 3'])), 'DC 2');
   assert.equal(nextSlotName(named(['DC 2'])), 'DC 1');
-  assert.equal(nextSlotName(named(['Rina', '', 'DC 1'])), 'DC 2');
+  assert.equal(nextSlotName(named(['Dewi', '', 'DC 1'])), 'DC 2');
   assert.ok(validateLayout({ slots: [{ ...newSlot('a', 0), name: nextSlotName([]) }] }));
 });
 
@@ -40,11 +40,12 @@ test('newSlotFrom menyalin ukuran crop dan tile, posisi mengikuti grid', () => {
 test('layout kosong valid dengan settings default', () => {
   assert.deepEqual(validateLayout({ slots: [] }), {
     slots: [],
-    settings: { animate: true, greenMin: 0.02, detectEnabled: true, bitrate: 8, fps: 30 },
+    settings: { animate: true, greenMin: 0.02, detectEnabled: true, bitrate: 8, fps: 30, frameW: 0, frameH: 0 },
     style: defaultStyle(),
     template: 'sticker-night',
     guides: { x: [], y: [] },
     presets: [],
+    library: [],
   });
 });
 
@@ -156,16 +157,16 @@ test('menormalkan nama, boolean, dan greenMin', () => {
   assert.equal(l.slots[0].name.length, 40);
   assert.equal(l.slots[0].cropLocked, true);
   assert.equal(l.slots[0].enabled, true);
-  assert.deepEqual(l.settings, { animate: false, greenMin: 1, detectEnabled: true, bitrate: 8, fps: 30 });
+  assert.deepEqual(l.settings, { animate: false, greenMin: 1, detectEnabled: true, bitrate: 8, fps: 30, frameW: 0, frameH: 0 });
   assert.equal(validateLayout({ slots: [], settings: { greenMin: 'abc' } }).settings.greenMin, 0.02);
   assert.equal(validateLayout({ slots: [], settings: { greenMin: 0 } }).settings.greenMin, 0.005);
   assert.equal(validateLayout({ slots: [], settings: { greenMin: 0.03 } }).settings.greenMin, 0.03);
 });
 
 test('slot: discordId hanya ID numerik Discord, selain itu kembali ke kotak hijau', () => {
-  const slot = id => validateLayout({ slots: [{ ...newSlot('a', 0), discordId: id, discordName: 'Pai' }] }).slots[0];
+  const slot = id => validateLayout({ slots: [{ ...newSlot('a', 0), discordId: id, discordName: 'Eko' }] }).slots[0];
   assert.equal(slot('333333444455556666').discordId, '333333444455556666');
-  assert.equal(slot('333333444455556666').discordName, 'Pai');
+  assert.equal(slot('333333444455556666').discordName, 'Eko');
   assert.equal(slot('abc').discordId, '');
   assert.equal(slot(123456).discordId, '');
   assert.equal(validateLayout({ slots: [newSlot('a', 0)] }).slots[0].discordId, '');
@@ -196,7 +197,7 @@ test('preset: "full" (nama & akun Discord ikut) bawaan true untuk preset lama', 
 });
 
 test('presetSlots: tanpa identitas hanya menyimpan susunan', () => {
-  const cam = { ...newSlot('a', 0), name: 'Piggy', detect: true, discordId: '111111', discordName: 'piggy' };
+  const cam = { ...newSlot('a', 0), name: 'Andi', detect: true, discordId: '111111', discordName: 'andi' };
   const logo = { ...newSlot('v', 1), name: 'Logo', image: '/uploads/0123456789abcdef.png', imgW: 10, imgH: 10, discordId: '222222', discordName: 'x' };
   const full = presetSlots([cam, logo], true);
   assert.deepEqual(full, [cam, logo]);
@@ -205,24 +206,24 @@ test('presetSlots: tanpa identitas hanya menyimpan susunan', () => {
   assert.deepEqual([bare[0].name, bare[0].detect, bare[0].discordId, bare[0].discordName], ['', false, '', '']);
   assert.deepEqual(bare[0].crop, cam.crop);
   assert.deepEqual([bare[1].name, bare[1].image, bare[1].discordId], ['Logo', logo.image, '']); // frame virtual: nama & gambar tetap
-  assert.equal(cam.name, 'Piggy', 'slot asal tidak diubah');
+  assert.equal(cam.name, 'Andi', 'slot asal tidak diubah');
 });
 
 test('applyPresetSlots: dengan identitas membawa frame Discord; tanpa identitas mulai kosong DC 1..n', () => {
   const s = (id, extra) => ({ ...newSlot(id, 0), ...extra });
-  const cur = [s('piggy', { name: 'Piggy', detect: true, discordId: '111111' })];
-  const full = applyPresetSlots({ full: true, slots: [s('poi', { name: 'Poi', detect: true, discordId: '222222' })] }, cur);
-  assert.deepEqual(full.map(x => [x.name, x.discordId, x.enabled]), [['Poi', '222222', true], ['Piggy', '111111', false]]);
-  const bare = applyPresetSlots({ full: false, slots: [s('a', { name: 'Poi', detect: true, discordId: '222222' }), s('b'), s('c', { name: 'DC 1' })] }, cur);
+  const cur = [s('andi', { name: 'Andi', detect: true, discordId: '111111' })];
+  const full = applyPresetSlots({ full: true, slots: [s('budi', { name: 'Budi', detect: true, discordId: '222222' })] }, cur);
+  assert.deepEqual(full.map(x => [x.name, x.discordId, x.enabled]), [['Budi', '222222', true], ['Andi', '111111', false]]);
+  const bare = applyPresetSlots({ full: false, slots: [s('a', { name: 'Budi', detect: true, discordId: '222222' }), s('b'), s('c', { name: 'DC 1' })] }, cur);
   assert.deepEqual(bare.map(x => [x.id, x.name, x.detect, x.discordId]), [['a', 'DC 1', false, ''], ['b', 'DC 2', false, ''], ['c', 'DC 3', false, '']]);
 });
 
 test('ganti preset: frame terikat Discord yang tidak ada di preset dibawa nonaktif', () => {
   const s = (id, discordId = '') => ({ ...newSlot(id, 0), discordId });
-  const cur = [s('piggy', '111111'), s('dc1'), s('poi', '222222'), s('kara', '333333')];
-  const next = [s('poi', '222222'), s('baru', '333333')]; // kara: akun sama sudah ada di preset dengan id lain
+  const cur = [s('andi', '111111'), s('dc1'), s('budi', '222222'), s('citra', '333333')];
+  const next = [s('budi', '222222'), s('baru', '333333')]; // citra: akun sama sudah ada di preset dengan id lain
   const out = carryDiscordSlots(cur, next);
-  assert.deepEqual(out.map(x => [x.id, x.enabled]), [['poi', true], ['baru', true], ['piggy', false]]);
+  assert.deepEqual(out.map(x => [x.id, x.enabled]), [['budi', true], ['baru', true], ['andi', false]]);
   assert.equal(out[2].discordId, '111111');
   assert.equal(cur[0].enabled, true); // slot asal tidak diubah
   const full = Array.from({ length: 16 }, (_, i) => s('n' + i));
@@ -235,12 +236,12 @@ test('mergeDraft: simpan popup crop hanya menimpa bidang popup; gaya, tile, dan 
   const v = { ...newSlot('v', 1), image: '/uploads/0123456789abcdef.png', imgW: 800, imgH: 600, name: 'Logo' };
   const cur = [a, v];
   const draft = structuredClone(cur);
-  draft[0] = { ...draft[0], name: 'Poi', enabled: false, crop: { x: 1200, y: 0, w: 400, h: 400 }, style: {}, place: { x: 0, y: 0, w: 1, h: 1 } };
+  draft[0] = { ...draft[0], name: 'Budi', enabled: false, crop: { x: 1200, y: 0, w: 400, h: 400 }, style: {}, place: { x: 0, y: 0, w: 1, h: 1 } };
   draft[1].name = 'diubah popup crop';
   draft.push({ ...newSlot('b', 2), place: { x: 1900, y: 1000, w: 448, h: 252 } });
   const out = mergeDraft(cur, draft, F);
   assert.deepEqual(out.map(s => s.id), ['a', 'v', 'b']);
-  assert.equal(out[0].name, 'Poi');
+  assert.equal(out[0].name, 'Budi');
   assert.equal(out[0].enabled, false);
   assert.deepEqual(out[0].crop, { x: 880, y: 0, w: 400, h: 400 }); // crop dijepit ke frame
   assert.deepEqual(out[0].baseCrop, out[0].crop);
@@ -289,4 +290,73 @@ test('safe zone game: semua area di dalam kanvas 1920x1080 dan berlabel', async 
       assert.ok(z.x >= 0 && z.y >= 0 && z.w > 0 && z.h > 0 && z.x + z.w <= 1920 && z.y + z.h <= 1080, z.label);
     }
   }
+});
+
+test('library: daftar virtual frame tersimpan (hanya frame virtual, id unik, maks 50)', () => {
+  const v = (id, extra) => ({ ...newSlot(id, 0), name: 'Logo ' + id, image: '/uploads/0123456789abcdef.png', imgW: 800, imgH: 600, discordId: '111111', discordName: 'andi', ...extra });
+  assert.deepEqual(validateLayout({ slots: [] }).library, []);
+  const l = validateLayout({ slots: [], library: [v('a'), newSlot('cam', 0), v('a', { name: 'dobel' }), v('b'), 'rusak'] });
+  assert.deepEqual(l.library.map(s => [s.id, s.name, s.discordId]), [['a', 'Logo a', '111111'], ['b', 'Logo b', '111111']]);
+  assert.equal(validateLayout({ slots: [], library: Array.from({ length: 60 }, (_, i) => v('v' + i)) }).library.length, 50);
+});
+
+const vf = (id, extra) => ({ ...newSlot(id, 0), name: 'Logo ' + id, image: '/uploads/0123456789abcdef.png', imgW: 10, imgH: 10, ...extra });
+
+test('rememberVirtual: frame virtual masuk ke depan daftar, diperbarui bila sudah ada; frame kamera diabaikan', () => {
+  let lib = rememberVirtual([], vf('a'));
+  lib = rememberVirtual(lib, vf('b'));
+  lib = rememberVirtual(lib, vf('a', { name: 'Logo baru', enabled: false }));
+  assert.deepEqual(lib.map(s => [s.id, s.name, s.enabled]), [['a', 'Logo baru', true], ['b', 'Logo b', true]]);
+  assert.equal(rememberVirtual(lib, newSlot('cam', 0)), lib);
+  assert.equal(rememberVirtual(lib, undefined), lib);
+});
+
+test('virtualLibrary: gabungan daftar, preset, dan kanvas, satu per id, dengan status', () => {
+  const list = virtualLibrary({
+    library: [vf('a'), vf('b')],
+    presets: [{ slots: [vf('b'), vf('c'), newSlot('cam', 0)] }, { slots: [vf('c')] }],
+    slots: [vf('a', { name: 'di kanvas' }), vf('d', { enabled: false })],
+  });
+  assert.deepEqual(list.map(e => [e.slot.id, e.saved, e.canvas, e.presets]), [['a', true, 'on', 0], ['b', true, null, 1], ['c', false, null, 2], ['d', false, 'off', 0]]);
+  assert.equal(list[0].slot.name, 'di kanvas'); // data kanvas paling baru
+});
+
+test('forgetVirtual: hapus permanen dari daftar dan semua preset; preset yang jadi kosong ikut hilang', () => {
+  const out = forgetVirtual({ library: [vf('a'), vf('b')], presets: [{ id: 'p1', slots: [vf('a'), vf('b')] }, { id: 'p2', slots: [vf('a')] }] }, 'a');
+  assert.deepEqual(out.library.map(s => s.id), ['b']);
+  assert.deepEqual(out.presets.map(p => [p.id, p.slots.map(s => s.id)]), [['p1', ['b']]]);
+});
+
+test('withVirtualSources: virtual frame tanpa sumber bicara memakai sumber dari daftar; yang lain tidak diubah', () => {
+  const lib = [vf('a', { discordId: '111111', discordName: 'andi' })];
+  const [a, b, cam, own] = withVirtualSources([vf('a'), vf('b'), { ...newSlot('a', 0) }, vf('a', { discordId: '222222', discordName: 'budi' })], lib);
+  assert.deepEqual([a.discordId, a.discordName, a.detect], ['111111', 'andi', true]);
+  assert.equal(b.discordId, '');
+  assert.equal(cam.discordId, ''); // frame kamera (tanpa gambar) tidak diisi
+  assert.equal(own.discordId, '222222'); // sumber sendiri dipertahankan
+});
+
+test('rescaleSlots: pindah monitor dengan rasio sama -> crop, baseCrop, dan kotak deteksi ikut diskalakan, bolak-balik kembali utuh', () => {
+  const cam = { ...newSlot('a', 0), crop: { x: 800, y: 400, w: 640, h: 360 }, baseCrop: { x: 800, y: 400, w: 640, h: 360 }, probe: { x: 784, y: 384, w: 32, h: 32 } };
+  const logo = vf('v');
+  const q = { w: 2560, h: 1440 }, f = { w: 1920, h: 1080 };
+  const [a, v] = rescaleSlots([cam, logo], q, f);
+  assert.deepEqual(a.crop, { x: 600, y: 300, w: 480, h: 270 });
+  assert.deepEqual(a.baseCrop, { x: 600, y: 300, w: 480, h: 270 });
+  assert.deepEqual(a.probe, { x: 588, y: 288, w: 24, h: 24 });
+  assert.equal(v, logo); // virtual frame tidak bergantung pada capture
+  assert.deepEqual(rescaleSlots([a], f, q)[0].crop, cam.crop); // balik ke monitor semula
+});
+
+test('rescaleSlots: rasio berbeda, ukuran sama, atau ukuran lama tidak diketahui -> tidak diubah', () => {
+  const slots = [newSlot('a', 0)];
+  assert.equal(rescaleSlots(slots, { w: 1920, h: 1080 }, { w: 1600, h: 1200 }), slots);
+  assert.equal(rescaleSlots(slots, { w: 1920, h: 1080 }, { w: 1920, h: 1080 }), slots);
+  assert.equal(rescaleSlots(slots, { w: 0, h: 0 }, { w: 1920, h: 1080 }), slots);
+});
+
+test('ukuran frame capture tersimpan di settings dan di preset; nilai rusak jadi 0', () => {
+  const l = validateLayout({ slots: [], settings: { frameW: 2560.4, frameH: 1440 }, presets: [{ id: 'p', name: 'p', slots: [newSlot('a', 0)], frameW: 1920, frameH: 'x' }] });
+  assert.deepEqual([l.settings.frameW, l.settings.frameH], [2560, 1440]);
+  assert.deepEqual([l.presets[0].frameW, l.presets[0].frameH], [1920, 0]);
 });

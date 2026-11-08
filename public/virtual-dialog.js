@@ -16,8 +16,9 @@ function fitCrop(a, w, h) {
 const revokeBlob = u => { if (u?.startsWith('blob:')) URL.revokeObjectURL(u); };
 
 // slots(): slot layout sekarang. ref(): frame acuan rasio frame baru (atau null). discord(): status Discord (null = tidak dipakai).
-// onSave({ id (null = baru), image, imgW, imgH, crop, bg, name, discordId, discordName }) setelah gambar terunggah.
-export function createVirtualDialog({ slots, ref, discord, onSave }) {
+// onSave({ id (null = baru), image, imgW, imgH, crop, bg, name, discordId, discordName, detect }) setelah gambar terunggah.
+// library(): virtual frame tersimpan (virtualLibrary). onPick(slot): pakai lagi di kanvas. onForget(id): hapus permanen.
+export function createVirtualDialog({ slots, ref, discord, onSave, library, onPick, onForget }) {
   // edit.crop = jendela pandang frame dalam piksel gambar; boleh melewati tepi gambar (di sana terlihat latar).
   let edit = null; // { id (null = baru), file, url, w, h, crop }
   const error = msg => { $('vErr').textContent = msg; $('vErr').hidden = !msg; };
@@ -66,7 +67,74 @@ export function createVirtualDialog({ slots, ref, discord, onSave }) {
     $('vFile').value = '';
     error('');
     $('vDialog').showModal();
-    render();
+    showLib(!s && library().length > 0); // Tambah: pilih dari daftar dulu, atau buat baru
+  }
+
+  // Mode daftar: kartu virtual frame tersimpan + kartu "buat baru". Mode editor: unggah dan atur gambar.
+  function showLib(on) {
+    $('vDialog').classList.toggle('lib', on);
+    $('vTitle').textContent = on ? 'Virtual frame' : edit.id ? 'Edit virtual frame' : 'Tambah virtual frame';
+    if (on) renderLib(); else render();
+  }
+  function renderLib() {
+    const fresh = document.createElement('button');
+    fresh.type = 'button';
+    fresh.className = 'v-card v-new';
+    const plus = document.createElement('span');
+    plus.textContent = '+';
+    const freshLabel = document.createElement('b');
+    freshLabel.textContent = 'Buat virtual frame baru';
+    fresh.append(plus, freshLabel);
+    fresh.onclick = () => showLib(false);
+    const cards = library().map(e => {
+      const s = e.slot, item = document.createElement('div');
+      item.className = 'v-item';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'v-card';
+      b.disabled = e.canvas === 'on';
+      const thumb = document.createElement('span');
+      thumb.className = 'v-thumb';
+      const fr = document.createElement('span'), a = s.crop.w / s.crop.h, h = Math.min(92, 154 / a);
+      fr.className = 'v-frame';
+      Object.assign(fr.style, { width: h * a + 'px', height: h + 'px' });
+      const box = virtualBox();
+      placeImage(box, s);
+      fr.append(box);
+      thumb.append(fr);
+      const name = document.createElement('b');
+      name.textContent = s.name || 'Tanpa nama';
+      const src = document.createElement('small');
+      src.textContent = s.discordName ? 'Bicara: ' + s.discordName : 'Tanpa sumber bicara';
+      const state = document.createElement('small');
+      state.className = 'v-state';
+      state.textContent = e.canvas === 'on' ? 'Sudah di kanvas' : e.canvas === 'off' ? 'Tersembunyi di kanvas' : '';
+      b.append(thumb, name, src, state);
+      box.firstChild.onerror = () => { item.classList.add('broken'); state.textContent = 'Gambar hilang'; }; // file gambar sudah tidak ada
+      b.onclick = () => { $('vDialog').close(); onPick(s); };
+      item.append(b);
+      if (e.canvas !== 'on') { // yang tampil di kanvas dihapus dari kanvas dulu
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'v-del';
+        del.textContent = 'Hapus';
+        del.title = 'Hapus permanen';
+        const warn = e.presets ? 'Dipakai di ' + e.presets + ' preset · klik lagi untuk hapus permanen' : 'Klik lagi untuk hapus permanen';
+        del.onclick = () => {
+          if (!del.classList.contains('armed')) {
+            del.classList.add('armed');
+            del.textContent = warn;
+            setTimeout(() => { del.classList.remove('armed'); del.textContent = 'Hapus'; }, 3000);
+            return;
+          }
+          onForget(s.id);
+          renderLib();
+        };
+        item.append(del);
+      }
+      return item;
+    });
+    $('vLibGrid').replaceChildren(fresh, ...cards);
   }
 
   function useFile(f) {
@@ -138,7 +206,8 @@ export function createVirtualDialog({ slots, ref, discord, onSave }) {
     const saved = {
       id: edit.id, image: url, imgW: edit.w, imgH: edit.h, crop: { ...edit.crop },
       bg: $('vBgNone').checked ? 'transparent' : $('vBg').value,
-      name: $('vName').value.trim(), discordId: $('vSource').value, discordName: $('vSource').value ? original(sel).replace(' (tidak di channel)', '') : '',
+      // frame virtual menyala hanya lewat Discord: detect ikut ada/tidaknya sumber bicara
+      name: $('vName').value.trim(), discordId: $('vSource').value, detect: !!$('vSource').value, discordName: $('vSource').value ? original(sel).replace(' (tidak di channel)', '') : '',
     };
     $('vDialog').close();
     onSave(saved);
