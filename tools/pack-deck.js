@@ -20,7 +20,7 @@ fs.cpSync(path.join(root, 'node_modules', 'ws'), path.join(plugin, 'node_modules
 });
 
 const zip = path.join(out, NAME + '.zip');
-// tar.exe bawaan Windows 10+ (bsdtar) membuat zip dari ekstensi. Path relatif: GNU tar (Git Bash) membaca "O:" sebagai host.
+// tar.exe bawaan Windows 10+ (bsdtar) membuat zip dari ekstensi. Path relatif: GNU tar (Git Bash) membaca huruf drive ("C:") sebagai nama host.
 const tar = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
 execFileSync(tar, ['-a', '-c', '-f', path.relative(stage, zip), NAME + '.sdPlugin'], { cwd: stage });
 const file = path.join(out, NAME + '.streamDeckPlugin');

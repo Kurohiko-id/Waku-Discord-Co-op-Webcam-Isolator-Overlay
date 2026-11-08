@@ -2,8 +2,17 @@
   "name": "waku",
   "productName": "Waku",
   "version": "1.0.0",
-  "description": "Susun webcam co-op Discord jadi satu tampilan untuk OBS",
-  "author": "Kurohiko",
+  "description": "Discord Co-op Webcam Isolator Overlay for OBS",
+  "author": {
+    "name": "Kurohiko",
+    "url": "https://kurohiko.id"
+  },
+  "license": "MIT",
+  "homepage":"https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator-Overlay",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator-Overlay.git"
+  },
   "private": true,
   "type": "module",
   "main": "electron/main.js",
@@ -14,12 +23,13 @@
     "app": "electron .",
     "app:check": "electron . --encoder-check",
     "deck": "node tools/pack-deck.js",
-    "dist": "node tools/pack-deck.js && electron-builder --win nsis"
+    "dist": "node tools/pack-deck.js && electron-builder --win nsis --publish never"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
+    "electron-updater": "6.8.11",
     "ws": "^8.22.0"
   },
   "devDependencies": {
@@ -29,7 +39,7 @@
   "build": {
     "appId": "id.kurohiko.waku",
     "productName": "Waku",
-    "copyright": "Kurohiko",
+    "copyright": "Copyright © 2026 Kurohiko",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -49,6 +59,13 @@
       {
         "from": "dist/deck/id.kurohiko.waku.streamDeckPlugin",
         "to": "id.kurohiko.waku.streamDeckPlugin"
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Kurohiko-id",
+        "repo": "Waku-Discord-Co-op-Webcam-Isolator-Overlay"
       }
     ],
     "electronFuses": {

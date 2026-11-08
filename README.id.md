@@ -108,6 +108,10 @@ npm test         # jalankan tes
 npm run dist     # buat installer di dist/
 ```
 
+## Lisensi
+
+[MIT](LICENSE) © 2026 Kurohiko
+
 ---
 
 Font di `public/fonts` (Baloo 2, Barlow, Barlow Semi Condensed) memakai SIL Open Font License 1.1.

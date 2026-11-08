@@ -7,7 +7,7 @@ import WebSocket from 'ws';
 import { createServer } from '../server.js';
 
 async function setup(opts = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kdc-log-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'waku-log-'));
   const logFile = path.join(dir, 'logs', 'waku.log');
   const srv = createServer({ port: 0, layoutFile: path.join(dir, 'layout.json'), logFile, statsEveryMs: 0, ...opts });
   const port = await srv.start();

@@ -9,7 +9,7 @@ import { encryptedFile } from '../secret-store.js';
 import { createServer } from '../server.js';
 
 const key = () => crypto.randomBytes(32).toString('base64');
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'kdc-sec-'));
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'waku-sec-'));
 
 test('encryptedFile: isi tidak tersimpan sebagai teks biasa, bisa dibaca lagi dengan kunci yang sama', () => {
   const dir = tmp(), k = key(), f = path.join(dir, 'x.enc');

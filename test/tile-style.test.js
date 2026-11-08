@@ -5,7 +5,7 @@ import { styleToVars, labelPos } from '../public/shared/tile-style.js';
 
 const v = key => styleToVars(TEMPLATES[key].style);
 
-test('Sticker Night: setara tampilan /preview yang sudah ada', () => {
+test('Sticker Night: nilai CSS tile sesuai gaya template', () => {
   const x = v('sticker-night');
   assert.equal(x['--r'], '20px');
   assert.equal(x['--sh-idle'], '0 0 0 5px #ffffff, 0 8px 18px rgba(31,35,71,0.35)');
