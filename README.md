@@ -1,8 +1,8 @@
 <p align="center">
-  <img src=".github/assets/banner.png" alt="Waku : Discord Co-op Webcam Isolator" width="100%">
+  <img src=".github/assets/banner.png" alt="Waku : Discord Co-op Webcam Isolator Overlay" width="100%">
 </p>
 
-<h1 align="center">Waku : Discord Co-op Webcam Isolator</h1>
+<h1 align="center">Waku : Discord Co-op Webcam Isolator Overlay</h1>
 
 <p align="center">
   <a href="https://kurohiko.id">kurohiko.id</a> ·
@@ -40,7 +40,7 @@ Waku crops your co-op friends' cameras out of the Discord window, arranges them 
 
 ## Install
 
-1. Download `Waku-Setup-<version>.exe` from [Releases](https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator/releases).
+1. Download `Waku-Setup-<version>.exe` from [Releases](https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator-Overlay/releases).
 2. Run the installer. If Windows SmartScreen shows a warning, click **More info**, then **Run anyway** (the installer isn't signed yet).
 3. Choose a language, finish the install, and open Waku.
 
@@ -91,7 +91,7 @@ Click **Install Stream Deck plugin** to install the plugin, or use a Stream Deck
 | Manual detection stays lit | Green clothing, background, or green screen. Move the detection box, raise the threshold in the **Detection** tab, or use **Official** mode. |
 | Discord won't connect | Make sure the Discord desktop app is open, then click the Discord pill in the top bar to retry. |
 
-To report a bug, open **Settings → Bug report**, click **Copy info**, and paste it into [Issues](https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator/issues). The report contains no Discord token or secret.
+To report a bug, open **Settings → Bug report**, click **Copy info**, and paste it into [Issues](https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator-Overlay/issues). The report contains no Discord token or secret.
 
 ## Data and uninstall
 

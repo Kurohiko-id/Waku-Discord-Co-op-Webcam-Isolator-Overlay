@@ -1,8 +1,8 @@
 <p align="center">
-  <img src=".github/assets/banner.png" alt="Waku : Discord Co-op Webcam Isolator" width="100%">
+  <img src=".github/assets/banner.png" alt="Waku : Discord Co-op Webcam Isolator Overlay" width="100%">
 </p>
 
-<h1 align="center">Waku : Discord Co-op Webcam Isolator</h1>
+<h1 align="center">Waku : Discord Co-op Webcam Isolator Overlay</h1>
 
 <p align="center">
   <a href="https://kurohiko.id">kurohiko.id</a> ·
@@ -40,7 +40,7 @@ Waku memotong kamera teman co-op dari jendela Discord, menyusunnya jadi satu tam
 
 ## Instal
 
-1. Unduh `Waku-Setup-<versi>.exe` dari halaman [Releases](https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator/releases).
+1. Unduh `Waku-Setup-<versi>.exe` dari halaman [Releases](https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator-Overlay/releases).
 2. Jalankan installer. Kalau muncul peringatan Windows SmartScreen, klik **More info** lalu **Run anyway** (installer belum ditandatangani).
 3. Pilih bahasa, selesaikan instalasi, lalu buka Waku.
 
@@ -91,7 +91,7 @@ Klik **Pasang plugin Stream Deck** untuk memasang plugin-nya, atau pakai aksi **
 | Deteksi Manual menyala terus | Baju, latar, atau green screen berwarna hijau. Geser kotak deteksi atau naikkan ambang di tab **Deteksi**, atau pakai mode **Official**. |
 | Discord tidak tersambung | Pastikan aplikasi Discord desktop sedang terbuka, lalu klik pill Discord di bar atas untuk mencoba lagi. |
 
-Untuk melaporkan bug, buka tab **Atur → Laporan bug**, klik **Salin info**, lalu tempel di [Issues](https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator/issues). Laporan ini tidak berisi token atau secret Discord.
+Untuk melaporkan bug, buka tab **Atur → Laporan bug**, klik **Salin info**, lalu tempel di [Issues](https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator-Overlay/issues). Laporan ini tidak berisi token atau secret Discord.
 
 ## Data dan uninstall
 
