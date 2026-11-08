@@ -1,6 +1,32 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { snapRect, ratioHeight, clampRect, resizeKeepRatio, snapResize, alignedLines, resizeCorner, cropFromTile } from '../public/shared/geometry.js';
+import { snapRect, ratioHeight, clampRect, resizeKeepRatio, snapResize, alignedLines, resizeCorner, cropFromTile, snapSpacing } from '../public/shared/geometry.js';
+
+// Tiga frame sebaris: frame 1 dan 2 berjarak 61 px; frame 3 digeser mendekati jarak yang sama dari frame 2.
+const f1 = { x: 100, y: 200, w: 300, h: 500 }, f2 = { x: 461, y: 200, w: 300, h: 500 };
+test('snapSpacing: jarak frame 3 ke frame 2 menempel ke jarak frame 1-2 (61 px), dengan garis ukur', () => {
+  const s = snapSpacing({ x: 829, y: 210, w: 300, h: 500 }, [f1, f2]); // jarak sekarang 68
+  assert.equal(s.x.d, -7); // x jadi 822 = 761 + 61
+  assert.deepEqual(s.x.marks.map(m => [m.axis, m.from, m.to, m.value]), [['x', 400, 461, 61], ['x', 761, 822, 61]]);
+  assert.equal(s.y, null); // tidak ada yang sebaris secara vertikal
+});
+
+test('snapSpacing: ke kiri juga, dan terlalu jauh tidak menempel', () => {
+  assert.equal(snapSpacing({ x: -270, y: 200, w: 300, h: 500 }, [f1, f2]).x.d, 9); // tepi kanan 30 -> 39 = 100 - 61
+  assert.equal(snapSpacing({ x: 850, y: 200, w: 300, h: 500 }, [f1, f2]).x, null); // jarak 89, selisih 28 > 12
+});
+
+test('snapSpacing: ditengahkan di antara dua tetangga, kedua jarak sama', () => {
+  const s = snapSpacing({ x: 205, y: 0, w: 100, h: 100 }, [{ x: 0, y: 0, w: 100, h: 100 }, { x: 400, y: 0, w: 100, h: 100 }]);
+  assert.equal(s.x.d, -5);
+  assert.deepEqual(s.x.marks.map(m => m.value), [100, 100]);
+});
+
+test('snapSpacing: tile yang tidak sebaris tidak dihitung; sumbu y bekerja sama', () => {
+  assert.equal(snapSpacing({ x: 829, y: 800, w: 300, h: 100 }, [f1, f2]).x, null);
+  const col = [{ x: 0, y: 0, w: 200, h: 100 }, { x: 0, y: 140, w: 200, h: 100 }]; // jarak vertikal 40
+  assert.equal(snapSpacing({ x: 10, y: 285, w: 200, h: 100 }, col).y.d, -5);
+});
 
 test('snapResize: lebar menempel ke lebar tile lain, tinggi ikut rasio, dan melaporkan kecocokan', () => {
   const others = [{ x: 600, y: 0, w: 448, h: 252 }];

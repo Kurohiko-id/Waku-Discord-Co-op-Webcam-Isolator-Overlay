@@ -120,3 +120,39 @@ export function snapRect(r, others, canvas = { w: 1920, h: 1080 }, threshold = 1
     guides: { x: bx ? [bx.line] : [], y: by ? [by.line] : [] },
   };
 }
+
+// Jarak sama saat menggeser: jarak r ke tile tetangga (yang sebaris) menempel ke jarak yang sudah ada di antara
+// dua tile lain, atau r ditengahkan di antara dua tetangganya. Per sumbu: { d (geser), marks } atau null.
+// mark = garis ukur { axis, from, to, at (posisi di sumbu silang), value } untuk ditampilkan di editor.
+export function snapSpacing(r, others, threshold = 12) {
+  const solve = (P, S, C, CS) => {
+    const end = o => o[P] + o[S];
+    const ov = (a, b) => a[C] < b[C] + b[CS] && b[C] < a[C] + a[CS]; // sebaris (bertumpuk di sumbu silang)
+    const mid = (a, b) => (Math.max(a[C], b[C]) + Math.min(a[C] + a[CS], b[C] + b[CS])) / 2;
+    const mark = (a, b, from, to) => ({ axis: P, from, to, at: mid(a, b), value: Math.round(to - from) });
+    // jarak yang sudah ada: tiap tile ke tetangga terdekatnya yang sebaris
+    const gaps = [];
+    for (const a of others) {
+      const b = others.filter(o => o !== a && ov(a, o) && o[P] >= end(a)).sort((p, q) => p[P] - q[P])[0];
+      if (b && b[P] - end(a) > 0) gaps.push({ g: b[P] - end(a), m: mark(a, b, end(a), b[P]) });
+    }
+    const row = others.filter(o => ov(o, r));
+    const center = r[P] + r[S] / 2;
+    const L = row.filter(o => end(o) <= center).sort((p, q) => end(q) - end(p))[0];
+    const R = row.filter(o => o[P] >= center).sort((p, q) => p[P] - q[P])[0];
+    const cands = [];
+    for (const { g, m } of gaps) {
+      if (L) cands.push({ v: end(L) + g, ref: m });
+      if (R) cands.push({ v: R[P] - g - r[S], ref: m });
+    }
+    if (L && R && R[P] - end(L) > r[S]) cands.push({ v: (end(L) + R[P] - r[S]) / 2 });
+    let best = null;
+    for (const c of cands) if (Math.abs(c.v - r[P]) <= threshold && (!best || Math.abs(c.v - r[P]) < Math.abs(best.v - r[P]))) best = c;
+    if (!best) return null;
+    const n = { ...r, [P]: best.v }, marks = best.ref ? [best.ref] : [];
+    if (L && Math.abs(n[P] - end(L) - (best.ref?.value ?? n[P] - end(L))) < 1) marks.push(mark(L, n, end(L), n[P]));
+    if (R && Math.abs(R[P] - end(n) - (best.ref?.value ?? R[P] - end(n))) < 1) marks.push(mark(n, R, end(n), R[P]));
+    return { d: best.v - r[P], marks };
+  };
+  return { x: solve('x', 'w', 'y', 'h'), y: solve('y', 'h', 'x', 'w') };
+}
