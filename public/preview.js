@@ -129,8 +129,14 @@ async function onSignal(d) {
     await iceDone(mine);
     if (pc !== mine) return;
     ws.send({ type: 'signal', data: { sdp: mine.localDescription, id: d.id } });
+    sendVisible(); // koneksi baru: kontrol mulai dari anggapan "terlihat"
   }
 }
+
+// OBS menandai halaman tersembunyi saat source tidak tampil (scene lain). Kontrol lalu menjeda encoder:
+// frame yang tetap dikirim hanya di-decode lalu dibuang. Saat tampil lagi, encoder lanjut (frame kunci baru).
+const sendVisible = () => ws.send({ type: 'visible', on: !document.hidden });
+document.addEventListener('visibilitychange', sendVisible);
 
 // ---- metrik berkala (tiap 10 detik): RAM, frame video, latensi bicara ----
 setInterval(() => {

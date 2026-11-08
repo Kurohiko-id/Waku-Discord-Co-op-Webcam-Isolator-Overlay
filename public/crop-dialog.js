@@ -262,9 +262,10 @@ export function createCropDialog({ video, frame, slots, greenMin, selected, make
     current: () => (draft ? { slot: draft.slot, greenMin: draft.greenMin, mode: mode(draft.slot) } : null),
     markHit: hit => els?.probe?.classList.toggle('hit', hit),
     // ukuran frame capture berubah saat popup terbuka: jepit crop dan kotak deteksi semua slot draft
-    reclamp() {
+    reclamp(k = 1) { // k: skala ukuran capture baru terhadap yang lama (pindah monitor dengan rasio sama)
       if (!draft) return;
-      for (const d of draft.slots) if (!d.image) { d.probe = clampRect(d.probe, frame()); d.crop = clampRect(d.crop, frame()); }
+      const sc = r => (k === 1 ? r : { x: r.x * k, y: r.y * k, w: r.w * k, h: r.h * k });
+      for (const d of draft.slots) if (!d.image) { d.probe = clampRect(sc(d.probe), frame()); d.crop = clampRect(sc(d.crop), frame()); }
       position();
     },
     refreshSource: () => { if (draft) fillSource(); }, // status Discord berubah

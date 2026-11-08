@@ -8,7 +8,7 @@ import { createServer } from '../server.js';
 import { newSlot } from '../public/shared/layout.js';
 
 async function setup() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kdc-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'waku-'));
   const layoutFile = path.join(dir, 'layout.json');
   const srv = createServer({ port: 0, layoutFile, logFile: path.join(dir, 'waku.log'), statsEveryMs: 0, uploadDir: path.join(dir, 'uploads') });
   const port = await srv.start();
@@ -82,6 +82,8 @@ test('speaking, signal, dan ready dirutekan', async () => {
   assert.deepEqual((await next(c, m => m.type === 'signal')).data, { sdp: 'answer' });
   p.send(JSON.stringify({ type: 'ready' }));
   await next(c, m => m.type === 'ready');
+  p.send(JSON.stringify({ type: 'visible', on: false }));
+  assert.deepEqual(await next(c, m => m.type === 'visible'), { type: 'visible', on: false });
   c.close(); p.close(); await srv.close();
 });
 
@@ -121,7 +123,7 @@ test('pesan terlalu besar memutus koneksi pengirim saja', async () => {
 });
 
 test('gagal menulis layout.json tidak mematikan server dan layout tetap diteruskan', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kdc-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'waku-'));
   const srv = createServer({ port: 0, layoutFile: path.join(dir, 'tidak-ada', 'layout.json'), logFile: path.join(dir, 'waku.log'), statsEveryMs: 0 });
   const port = await srv.start();
   const c = await open(port, 'control');
@@ -144,10 +146,12 @@ test('signal dan ready hanya untuk preview terbaru, layout ke semua preview', as
   await next(p1, isLayout); await next(p2, isLayout);
   assert.equal(p1.q.filter(m => m.type === 'signal').length, 0);
   p1.send(JSON.stringify({ type: 'ready' }));
+  p1.send(JSON.stringify({ type: 'visible', on: false })); // preview lama yang tidak menerima video: diabaikan
   p2.send(JSON.stringify({ type: 'ready' }));
   await next(c, m => m.type === 'ready');
   await new Promise(r => setTimeout(r, 100));
   assert.equal(c.q.filter(m => m.type === 'ready').length, 0);
+  assert.equal(c.q.filter(m => m.type === 'visible').length, 0);
   c.close(); p1.close(); p2.close(); await srv.close();
 });
 
@@ -182,7 +186,7 @@ test('URL request malformed dijawab 400, server tetap hidup', async () => {
 });
 
 test('layout.json rusak disimpan sebagai .bad, bukan ditimpa diam-diam', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kdc-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'waku-'));
   const layoutFile = path.join(dir, 'layout.json');
   fs.writeFileSync(layoutFile, '{ rusak');
   const srv = createServer({ port: 0, layoutFile, logFile: path.join(dir, 'waku.log'), statsEveryMs: 0 });
@@ -320,21 +324,22 @@ test('control menerima versi; info dan bersihkan gambar unggahan yang tidak dipa
   fs.writeFileSync(up + '/aaaaaaaaaaaaaaaa.png', 'x'.repeat(10)); // dipakai frame virtual
   fs.writeFileSync(up + '/bbbbbbbbbbbbbbbb.png', 'y'.repeat(20)); // dipakai preset
   fs.writeFileSync(up + '/cccccccccccccccc.png', 'z'.repeat(30)); // tidak dipakai
+  fs.writeFileSync(up + '/dddddddddddddddd.png', 'w'.repeat(40)); // hanya di daftar virtual frame tersimpan
   const c = await open(port, 'control');
   assert.match((await next(c, m => m.type === 'info')).version, /^[0-9]+[.][0-9]+[.][0-9]+$/);
   const v = name => ({ ...newSlot('v' + name, 0), image: '/uploads/' + name + '.png', imgW: 10, imgH: 10 });
-  c.send(JSON.stringify({ type: 'layout', layout: { slots: [v('aaaaaaaaaaaaaaaa')], presets: [{ id: 'p', name: 'p', slots: [v('bbbbbbbbbbbbbbbb')] }] } }));
+  c.send(JSON.stringify({ type: 'layout', layout: { slots: [v('aaaaaaaaaaaaaaaa')], presets: [{ id: 'p', name: 'p', slots: [v('bbbbbbbbbbbbbbbb')] }], library: [v('dddddddddddddddd')] } }));
   await sleep(50);
   c.send(JSON.stringify({ type: 'uploads_info' }));
-  assert.deepEqual(await next(c, m => m.type === 'uploads'), { type: 'uploads', count: 3, bytes: 60, unusedCount: 1, unusedBytes: 30, removed: 0 });
+  assert.deepEqual(await next(c, m => m.type === 'uploads'), { type: 'uploads', count: 4, bytes: 100, unusedCount: 1, unusedBytes: 30, removed: 0 });
   c.send(JSON.stringify({ type: 'uploads_clean' }));
-  assert.deepEqual(await next(c, m => m.type === 'uploads'), { type: 'uploads', count: 2, bytes: 30, unusedCount: 0, unusedBytes: 0, removed: 1 });
-  assert.deepEqual(fs.readdirSync(up).sort(), ['aaaaaaaaaaaaaaaa.png', 'bbbbbbbbbbbbbbbb.png']);
+  assert.deepEqual(await next(c, m => m.type === 'uploads'), { type: 'uploads', count: 3, bytes: 70, unusedCount: 0, unusedBytes: 0, removed: 1 });
+  assert.deepEqual(fs.readdirSync(up).sort(), ['aaaaaaaaaaaaaaaa.png', 'bbbbbbbbbbbbbbbb.png', 'dddddddddddddddd.png']);
   c.close(); await srv.close();
 });
 
 test('layout.json rusak: control diberi peringatan, dan backup .bad tetap utuh setelah layout baru disimpan', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kdc-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'waku-'));
   const layoutFile = path.join(dir, 'layout.json');
   fs.writeFileSync(layoutFile, '{ rusak');
   const srv = createServer({ port: 0, layoutFile, logFile: path.join(dir, 'waku.log'), statsEveryMs: 0, persistDelayMs: 0 });
@@ -349,7 +354,7 @@ test('layout.json rusak: control diberi peringatan, dan backup .bad tetap utuh s
 });
 
 test('gagal menyimpan layout: control diberi peringatan (bukan hanya log)', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kdc-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'waku-'));
   const srv = createServer({ port: 0, layoutFile: path.join(dir, 'tidak-ada', 'layout.json'), logFile: path.join(dir, 'waku.log'), statsEveryMs: 0, persistDelayMs: 0 });
   const port = await srv.start();
   const c = await open(port, 'control');
@@ -377,7 +382,7 @@ test('DNS rebinding: Host asing ditolak untuk HTTP dan WebSocket; halaman membaw
 });
 
 test('kredensial Discord dari tab Atur: disimpan, secret tidak pernah dikirim balik, token lama dibuang saat ID berganti, bisa dihapus', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kdc-dc-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'waku-dc-'));
   const discordFile = path.join(dir, 'discord.json');
   const tokenFile = path.join(dir, 'discord-token.json');
   fs.writeFileSync(discordFile, JSON.stringify({ clientId: '111111111111111111', clientSecret: 'lama_secret_123' }));
@@ -413,7 +418,7 @@ test('kredensial Discord dari tab Atur: disimpan, secret tidak pernah dikirim ba
 });
 
 test('tanpa discord.json: control tetap diberi status unset supaya form kosong tampil', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kdc-dc-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'waku-dc-'));
   const srv = createServer({ port: 0, layoutFile: path.join(dir, 'layout.json'), logFile: path.join(dir, 'waku.log'), statsEveryMs: 0, discordFile: path.join(dir, 'discord.json'), tokenFile: path.join(dir, 't.json') });
   const port = await srv.start();
   const c = await open(port, 'control');
@@ -423,7 +428,7 @@ test('tanpa discord.json: control tetap diberi status unset supaya form kosong t
 });
 
 test('port sudah dipakai: start() ditolak dengan EADDRINUSE (tidak menggantung, tidak uncaught)', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kdc-port-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'waku-port-'));
   const a = createServer({ port: 0, layoutFile: path.join(dir, 'a.json'), logFile: path.join(dir, 'a.log'), statsEveryMs: 0 });
   const port = await a.start();
   const b = createServer({ port, layoutFile: path.join(dir, 'b.json'), logFile: path.join(dir, 'b.log'), statsEveryMs: 0 });
@@ -455,4 +460,19 @@ test('plugin Stream Deck (role deck): status dari control diteruskan, perintah d
   c.close();
   assert.equal((await next(d, m => m.type === 'state')).control, false); // control putus: tombol tahu
   d.close(); await srv.close();
+});
+
+test('instalasi baru (belum ada layout.json): mulai dengan preset bawaan P2-P7; layout rusak tetap mulai kosong', async () => {
+  const { srv, port, dir } = await setup();
+  const c = await open(port, 'control');
+  const l = (await next(c, m => m.type === 'layout')).layout;
+  assert.deepEqual(l.presets.map(p => p.name), [2, 3, 4, 5, 6, 7].map(n => 'P' + n + '-default'));
+  assert.deepEqual(l.slots, []);
+  c.close(); await srv.close();
+  const bad = path.join(dir, 'rusak.json');
+  fs.writeFileSync(bad, '{ rusak');
+  const srv2 = createServer({ port: 0, layoutFile: bad, logFile: path.join(dir, 'waku2.log'), statsEveryMs: 0 });
+  const c2 = await open(await srv2.start(), 'control');
+  assert.deepEqual((await next(c2, m => m.type === 'layout')).layout.presets, []);
+  c2.close(); await srv2.close();
 });

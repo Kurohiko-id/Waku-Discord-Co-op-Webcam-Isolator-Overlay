@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { validateLayout } from './public/shared/layout.js';
+import { defaultPresets } from './public/shared/default-presets.js';
 import { createDiscord } from './discord.js';
 import { jsonFile, encryptedFile } from './secret-store.js';
 
@@ -29,7 +30,7 @@ const emptyLayout = () => validateLayout({ slots: [] });
 // File yang ada tapi rusak/tidak valid disalin ke .bad dulu: commit berikutnya akan menimpanya.
 function readLayout(file, onBad) {
   let raw;
-  try { raw = fs.readFileSync(file, 'utf8'); } catch { return emptyLayout(); } // belum ada
+  try { raw = fs.readFileSync(file, 'utf8'); } catch { return validateLayout({ slots: [], presets: defaultPresets() }); } // belum ada (instalasi baru): mulai dengan preset bawaan
   let v = null;
   try { v = validateLayout(JSON.parse(raw)); } catch { /* JSON rusak */ }
   if (v) return v;
@@ -39,7 +40,7 @@ function readLayout(file, onBad) {
 }
 
 // Preview tidak memakai preset dan garis bantu; jangan kirim ulang semuanya tiap drag.
-const forPreview = ({ presets: _p, guides: _g, ...rest }) => rest;
+const forPreview = ({ presets: _p, guides: _g, library: _l, ...rest }) => rest;
 
 export function createServer({
   port = 1500,
@@ -228,9 +229,9 @@ export function createServer({
     for (const [ws, r] of clients) if (r === role && ws.readyState === 1) last = ws;
     return last;
   };
-  // Gambar unggahan: dipakai bila dirujuk frame virtual di layout atau di preset mana pun. Yang tidak dipakai boleh dihapus.
+  // Gambar unggahan: dipakai bila dirujuk frame virtual di layout, di preset mana pun, atau di daftar virtual frame tersimpan. Yang tidak dipakai boleh dihapus.
   function uploads(clean) {
-    const used = new Set([...layout.slots, ...layout.presets.flatMap(p => p.slots)].map(x => x.image && path.basename(x.image)).filter(Boolean));
+    const used = new Set([...layout.slots, ...layout.presets.flatMap(p => p.slots), ...layout.library].map(x => x.image && path.basename(x.image)).filter(Boolean));
     const out = { count: 0, bytes: 0, unusedCount: 0, unusedBytes: 0, removed: 0 };
     let names = [];
     try { names = fs.readdirSync(uploadDir).filter(n => UPLOAD_NAME.test(n)); } catch { /* belum ada unggahan */ }
@@ -419,6 +420,8 @@ export function createServer({
         sendWs(latest(peer), { type: 'signal', data: msg.data });
       } else if (msg.type === 'ready' && role === 'preview' && ws === latest('preview')) {
         sendWs(latest('control'), { type: 'ready' });
+      } else if (msg.type === 'visible' && role === 'preview' && ws === latest('preview')) {
+        sendWs(latest('control'), { type: 'visible', on: msg.on !== false }); // hanya preview yang menerima video
       }
     });
   });

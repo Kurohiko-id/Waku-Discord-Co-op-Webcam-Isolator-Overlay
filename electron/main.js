@@ -1,6 +1,6 @@
 // Proses utama Electron: menjalankan server Waku di utilityProcess (data di userData) dan membuka /control.
 // `electron . --encoder-check` hanya mengecek encoder video (H264/hardware) lalu keluar.
-import { app, BrowserWindow, utilityProcess, shell, session, desktopCapturer, dialog, ipcMain, Tray, Menu, nativeImage, clipboard, safeStorage, crashReporter, globalShortcut } from 'electron';
+import { app, BrowserWindow, utilityProcess, shell, session, desktopCapturer, dialog, ipcMain, Tray, Menu, nativeImage, clipboard, safeStorage, crashReporter, globalShortcut, screen } from 'electron';
 import fs from 'node:fs';
 import net from 'node:net';
 import crypto from 'node:crypto';
@@ -9,6 +9,9 @@ import { fileURLToPath } from 'node:url';
 import { logDir, mainLog, errMsg, readSettings, saveSettings } from './settings.js';
 import { createShortcuts } from './shortcuts.js';
 import { bugReport } from './bug-report.js';
+import { createUpdater } from './updater.js';
+import { centerIn } from './placement.js';
+import updaterPkg from 'electron-updater';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK = !app.isPackaged && process.argv.includes('--encoder-check'); // alat developer, tidak ada di installer
@@ -210,6 +213,19 @@ ipcMain.handle('app:shortcuts', e => (fromMain(e) ? shortcuts.state() : null));
 ipcMain.handle('app:shortcutsPause', (e, paused) => (fromMain(e) ? shortcuts.pause(paused) : null));
 ipcMain.handle('app:setShortcuts', (e, list) => (fromMain(e) ? shortcuts.set(list) : null));
 app.on('will-quit', shortcuts.clear);
+
+// Update dari GitHub Releases: dicek sekali saat Waku dibuka; unduh dan pasang hanya lewat tombol di halaman kontrol.
+const updates = createUpdater({
+  updater: app.isPackaged ? updaterPkg.autoUpdater : null, packaged: app.isPackaged,
+  log: mainLog, send: s => win?.webContents.send('app:update', s),
+});
+ipcMain.handle('app:update', (e, action) => {
+  if (!fromMain(e)) return null;
+  if (action === 'check') return updates.check(true);
+  if (action === 'download') return updates.download();
+  if (action === 'install') { if (updates.state().status === 'ready') quitting = true; return updates.install(); } // jendela tidak sembunyi ke tray
+  return updates.state();
+});
 ipcMain.handle('app:freePort', e => (fromMain(e) ? freePort() : null));
 ipcMain.handle('app:setPort', async (e, value) => {
   if (!fromMain(e)) return { ok: false, error: 'denied' };
@@ -250,7 +266,7 @@ function createWindow(port) {
 // Picker capture sendiri (Electron tidak punya picker bawaan di Windows). Pilihan terakhir diingat selama app jalan.
 let pickerWin = null, lastPick = null;
 const here = path.dirname(fileURLToPath(import.meta.url));
-// Jendela aplikasi Discord berjudul "Discord" atau "... - Discord"; tab browser ("Discord Developer Portal - Vivaldi") bukan.
+// Jendela aplikasi Discord berjudul "Discord" atau "... - Discord"; tab browser ("Discord Developer Portal - Chrome") bukan.
 const isDiscordWindow = name => /(^|\s-\s)Discord$/i.test(name.trim());
 
 ipcMain.handle('picker:sources', async e => {
@@ -267,11 +283,20 @@ ipcMain.handle('picker:sources', async e => {
   return { sources, last: lastPick };
 });
 
+// Posisi popup: di tengah jendela Waku dan di monitor yang sama (tanpa ini Windows menaruhnya di tengah monitor utama).
+// Tetap di dalam area kerja monitor itu. Jendela Waku tersembunyi di tray: monitor tempat kursor berada.
+function centeredOn(parent, width, height) {
+  const shown = parent && !parent.isDestroyed() && parent.isVisible() && !parent.isMinimized();
+  const b = shown ? parent.getBounds() : null;
+  const area = (b ? screen.getDisplayMatching(b) : screen.getDisplayNearestPoint(screen.getCursorScreenPoint())).workArea;
+  return centerIn(b ?? area, area, width, height);
+}
+
 function pickSource() {
   return new Promise(resolve => {
     pickerWin?.close(); // permintaan capture baru menggantikan picker yang masih terbuka
     const w = new BrowserWindow({
-      parent: win ?? undefined, modal: !!win, show: false, width: 860, height: 620, minWidth: 520, minHeight: 400,
+      parent: win ?? undefined, modal: !!win, show: false, ...centeredOn(win, 860, 620), minWidth: 520, minHeight: 400,
       minimizable: false, maximizable: false, autoHideMenuBar: true, backgroundColor: '#111111', title: 'Waku',
       webPreferences: { preload: path.join(here, 'preload-picker.cjs'), sandbox: true, contextIsolation: true },
     });
@@ -319,7 +344,7 @@ app.whenReady().then(() => {
   const data = app.getPath('userData');
   migrate(data);
   captureHandler();
-  startServer(p => { if (!port) { port = p; createWindow(p); createTray(); shortcuts.register(); } });
+  startServer(p => { if (!port) { port = p; createWindow(p); createTray(); shortcuts.register(); setTimeout(() => updates.check(), 8000); } });
 });
 
 app.on('second-instance', showWin); // membuka Waku lagi saat sudah jalan: tampilkan jendela yang ada
