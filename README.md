@@ -2,7 +2,7 @@
   <img src=".github/assets/banner.png" alt="Waku : Discord Co-op Webcam Isolator" width="100%">
 </p>
 
-<h1 align="center">Waku : Discord Co-op Webcam Isolator</h1>
+<h1 align="center">Waku : Discord Co-op Webcam Isolator Overlay</h1>
 
 <p align="center">
   <a href="https://kurohiko.id">kurohiko.id</a> ·
