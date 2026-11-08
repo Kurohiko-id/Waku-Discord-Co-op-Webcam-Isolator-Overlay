@@ -1,0 +1,20 @@
+/* Hanya transform dan opacity yang dianimasikan (dikerjakan compositor): box-shadow beranimasi memaksa
+   paint ulang tiap frame di OBS. Bayangan diam statis di tile; cahaya bicara statis di ::after, dimunculkan lewat opacity. */
+.ktile { position: absolute; border-radius: var(--r, 0); box-shadow: var(--sh-idle, none); transition: transform .22s cubic-bezier(.16, 1, .3, 1); }
+.ktile::after { content: ''; position: absolute; inset: 0; z-index: 1; border-radius: var(--r, 0); box-shadow: var(--sh-glow, none); opacity: 0; transition: opacity .22s; pointer-events: none; }
+.ktile canvas { width: 100%; height: 100%; display: block; border-radius: var(--r, 0); }
+.kvirt { position: absolute; inset: 0; overflow: hidden; border-radius: var(--r, 0); }
+.kvirt img { position: absolute; max-width: none; max-height: none; display: block; user-select: none; pointer-events: none; }
+.ktile.virtual canvas { visibility: hidden; } /* tetap memberi ukuran, tapi gambar yang terlihat */
+.ktile.speaking { transform: var(--tf-speak, none); }
+.ktile.speaking::after { opacity: 1; }
+.ktile .kname { position: absolute; z-index: 2; max-width: 80%; padding: 2px 12px; font: 700 18px/1.35 'Baloo 2', system-ui, sans-serif; color: #fff; background: rgba(20, 22, 43, .78); border-radius: 999px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.ktile .kname[hidden] { display: none; }
+.ktile .kname.tl { left: 10px; top: 10px; }
+.ktile .kname.tr { right: 10px; top: 10px; }
+.ktile .kname.bl { left: 10px; bottom: 10px; }
+.ktile .kname.br { right: 10px; bottom: 10px; }
+.ktile .kbubble { position: absolute; right: 14px; top: -20px; width: 54px; height: 34px; border-radius: 17px; opacity: 0; transform: scale(.6); pointer-events: none; transition: opacity .15s, transform .22s cubic-bezier(.16, 1, .3, 1);
+  background: radial-gradient(circle at 14px 50%, #fff 3.5px, transparent 4.5px), radial-gradient(circle at 27px 50%, #fff 3.5px, transparent 4.5px), radial-gradient(circle at 40px 50%, #fff 3.5px, transparent 4.5px), var(--glow, #3ddc97); }
+.ktile .kbubble[hidden] { display: none; }
+.ktile.speaking .kbubble { opacity: 1; transform: scale(1); }

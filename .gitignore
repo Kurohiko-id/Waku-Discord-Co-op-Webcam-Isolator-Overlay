@@ -1,0 +1,15 @@
+node_modules/
+
+# data lokal saat `npm start` (aplikasi Electron menyimpannya di userData)
+layout.json
+layout.json.tmp
+layout.json.bad
+logs/
+uploads/
+
+# kredensial aplikasi Discord (jangan di-commit)
+discord.json
+discord-token.json
+
+# hasil build installer
+dist/

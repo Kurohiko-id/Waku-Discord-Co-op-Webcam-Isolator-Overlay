@@ -1,0 +1,89 @@
+{
+  "name": "waku",
+  "productName": "Waku",
+  "version": "1.0.0",
+  "description": "Susun webcam co-op Discord jadi satu tampilan untuk OBS",
+  "author": "Kurohiko",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test",
+    "log": "node tools/logsum.js",
+    "app": "electron .",
+    "app:check": "electron . --encoder-check",
+    "deck": "node tools/pack-deck.js",
+    "dist": "node tools/pack-deck.js && electron-builder --win nsis"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "electron": "44.10.2",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "id.kurohiko.waku",
+    "productName": "Waku",
+    "copyright": "Kurohiko",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "package.json",
+      "server.js",
+      "discord.js",
+      "secret-store.js",
+      "electron/**",
+      "!electron/encoder-check.js",
+      "public/**",
+      "tools/logsum.js",
+      "build/icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/deck/id.kurohiko.waku.streamDeckPlugin",
+        "to": "id.kurohiko.waku.streamDeckPlugin"
+      }
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": false,
+      "displayLanguageSelector": true,
+      "installerLanguages": [
+        "en_US",
+        "id_ID"
+      ],
+      "language": "1033",
+      "include": "build/installer.nsh",
+      "artifactName": "Waku-Setup-${version}.exe",
+      "shortcutName": "Waku",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "electronLanguages": [
+      "en-US",
+      "id"
+    ]
+  }
+}

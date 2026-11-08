@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waku</title>
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/shared/tile.css">
+<link rel="stylesheet" href="/control.css">
+</head>
+<body>
+<header class="top">
+  <span class="crumb" title="Waku — Discord Co-op Camera Isolator by Kurohiko">Waku / <b>Layout</b></span>
+  <span class="spacer"></span>
+  <span id="status"></span>
+  <span id="notice" role="alert"></span>
+  <div class="url">
+      <span id="previewUrl">http://localhost:1500/preview</span>
+      <button id="copyUrl" type="button" aria-label="Salin link preview" title="Salin link preview">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15 9V6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15H9"/></svg>
+      </button>
+      <span id="copyNote" role="status" aria-live="polite"></span>
+  </div>
+  <span class="pill" title="Koneksi halaman ini ke server lokal. Kalau terputus, perubahan tidak sampai ke OBS dan tidak tersimpan."><i class="dot"></i>Server <b id="wsState" class="off">...</b></span>
+  <span class="pill" id="capChip" title="Capture jendela Discord. Kalau mati, OBS tidak menerima video."><i class="dot"></i>Capture <b id="capState" class="off">mati</b></span>
+  <button type="button" class="pill" id="dcChip" hidden title="Status bicara langsung dari aplikasi Discord di PC ini."><i class="dot"></i>Discord <b id="dcState" class="off">...</b></button>
+  <button type="button" class="pill" id="detChip" title="Deteksi bicara untuk semua frame. Klik untuk menyalakan atau mematikan."><i class="dot"></i>Deteksi <b id="detState" class="off">mati</b></button>
+  <button id="pause" class="btn icon" type="button" aria-pressed="false" aria-label="Jeda pratinjau" title="Jeda pratinjau: hemat resource, berhenti menggambar ulang tile di kanvas. Stream ke OBS dan deteksi bicara tetap jalan. Menggambar ulang juga berhenti sendiri saat tab ini tersembunyi."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg></button>
+  <button id="helpBtn" class="btn icon" type="button" aria-label="Persiapan sebelum live" title="Persiapan sebelum live"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/></svg></button>
+</header>
+
+<main class="work" id="work">
+  <nav class="rail tabs" role="tablist" aria-label="Pengaturan">
+    <span class="logo-mark" aria-hidden="true">WAKU</span>
+    <button type="button" class="tab" role="tab" aria-selected="true" data-tab="panelUmum" data-title="Tema &amp; gaya"><span class="chip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></span>Tema</button>
+    <button type="button" class="tab" role="tab" aria-selected="false" data-tab="panelSlot" data-title="Frame terpilih"><span class="chip"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="3"/><circle cx="12" cy="12" r="2.5"/></svg></span>Frame</button>
+    <button type="button" class="tab" role="tab" aria-selected="false" data-tab="panelDeteksi" data-title="Deteksi bicara"><span class="chip"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span>Deteksi</button>
+    <button type="button" class="tab" role="tab" aria-selected="false" data-tab="panelPreset" data-title="Template &amp; preset"><span class="chip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5"/></svg></span>Preset</button>
+    <button type="button" class="tab" role="tab" aria-selected="false" data-tab="panelMassal" data-title="Aksi massal"><span class="chip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></span>Massal</button>
+    <button type="button" class="tab" role="tab" aria-selected="false" data-tab="panelAtur" data-title="Pengaturan"><span class="chip"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>Atur</button>
+    <span class="grow"></span>
+    <button type="button" id="langBtn" aria-label="Bahasa / Language" title="Bahasa / Language">ID</button>
+    <button type="button" id="collapse" aria-label="Lipat atau buka panel" title="Lipat / buka panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+  </nav>
+
+  <aside class="drawer" id="drawer">
+    <div class="drawer-head"><h2 id="drawerTitle">Umum</h2></div>
+    <div class="drawer-body">
+      <div class="tabpanel" id="panelUmum" role="tabpanel">
+        <div class="box" id="generalBox">
+          <label class="sf-row"><span>Theme Template</span><select id="gTemplate"><option value="">Pilih template...</option></select></label>
+          <button id="fxTest" class="btn small" type="button" title="Frame terpilih berpura-pura bicara 2 detik di kanvas dan /preview, tanpa Discord dan tanpa deteksi">Coba efek bicara</button>
+          <div id="generalHost"></div>
+        </div>
+      </div>
+
+      <div class="tabpanel" id="panelSlot" role="tabpanel" hidden>
+        <p class="hint" id="slotHint">Klik tile di kanvas untuk memilih frame.</p>
+        <div class="box" id="slotForm" hidden>
+          <label class="sf-row"><span title="Juga dipakai sebagai label di tile">Nama</span><input id="fName" maxlength="40"></label>
+          <button id="editCrop" class="btn small" type="button">Edit frame...</button><br>
+          <label><input type="checkbox" id="fPlaceLock">Kunci resize tile</label><br>
+          <label><input type="checkbox" id="fEnabled">Aktif</label>
+          <details id="slotStyleBox"><summary>Gaya frame (timpa umum)</summary>
+            <div id="slotStyleHost"></div>
+            <button id="slotStyleReset" class="btn small" type="button">Kembalikan semua ke umum</button>
+          </details>
+        </div>
+      </div>
+
+      <div class="tabpanel" id="panelDeteksi" role="tabpanel" hidden>
+        <div class="box">
+          <label><input type="checkbox" id="sDetect">Deteksi bicara (Discord dan kotak hijau)</label><br>
+          <label><input type="checkbox" id="sAnimate">Animasi saat bicara</label>
+          <label class="sf-row"><span>Ambang hijau <b id="sGreenVal"></b></span><input type="range" id="sGreen" min="0.005" max="1" step="0.005"></label>
+        </div>
+      </div>
+
+      <div class="tabpanel" id="panelPreset" role="tabpanel" hidden>
+        <div class="box" id="autoBox">
+          <h3>Template otomatis</h3>
+          <label class="sf-row"><span>Susunan</span><select id="aKind" title="Menata ulang posisi dan ukuran semua tile aktif. Crop tidak berubah."><option value="">Pilih susunan...</option><option value="grid">Grid rata</option><option value="row">Satu baris (kiri ke kanan)</option><option value="column">Satu kolom (atas ke bawah)</option><option value="main-right">Satu besar, sisanya di kanan</option><option value="main-bottom">Satu besar, sisanya di bawah</option><option value="bottom">Rata bawah (satu baris)</option><option value="top">Rata atas (satu baris)</option><option value="sides">Kiri-kanan (setengah-setengah)</option></select></label>
+          <label class="sf-row"><span>Jarak <b id="aGapVal">32</b> px</span><input type="range" id="aGap" min="0" max="100" step="1" value="32"></label>
+          <button id="aUndo" class="btn small" type="button" disabled>Urungkan template</button>
+        </div>
+        <div class="box" id="presetBox">
+          <h3>Preset layout</h3>
+          <label class="sf-row"><span>Nama preset</span><input id="pName" maxlength="40" placeholder="mis. Duo atas-bawah"></label>
+          <label title="Nyalakan untuk teman mabar tetap: nama frame dan akun Discord (deteksi Official) ikut tersimpan. Matikan untuk susunan umum: saat dipakai, frame mulai kosong (DC 1, DC 2, ...) dengan deteksi nonaktif."><input type="checkbox" id="pFull">Simpan juga nama frame &amp; akun Discord</label>
+          <button id="pSave" class="btn small" type="button">Simpan susunan sekarang</button>
+          <div id="pList"></div>
+          <button id="pUndo" class="btn small" type="button" disabled>Urungkan terapkan preset</button>
+        </div>
+      </div>
+
+      <div class="tabpanel" id="panelMassal" role="tabpanel" hidden>
+        <div class="box" id="bulkBox">
+          <label class="sf-row"><span>Lebar tile <b id="bWidthVal">480</b> px</span><input type="range" id="bWidth" min="32" max="1920" step="1" value="480"></label>
+          <label class="sf-row"><span>Rasio crop</span>
+            <select id="bRatio"><option value="">Jangan ubah</option><option value="1.7778">16:9</option><option value="1.3333">4:3</option><option value="1">1:1</option><option value="0.5625">9:16</option></select></label>
+          <label class="sf-row"><span>Kolom grid <b id="bColsVal">2</b></span><input type="range" id="bCols" min="1" max="8" step="1" value="2"></label>
+          <label class="sf-row"><span>Jarak <b id="bGapVal">20</b> px</span><input type="range" id="bGap" min="0" max="200" step="1" value="20"></label>
+          <button id="bUndo" class="btn small red" type="button" disabled>Urungkan aksi massal</button>
+        </div>
+      </div>
+      <div class="tabpanel" id="panelAtur" role="tabpanel" hidden>
+        <div class="box">
+          <h3>Video ke OBS</h3>
+          <label class="sf-row"><span>Bitrate <b id="oBitrateVal">8</b> Mbps</span><input type="range" id="oBitrate" min="2" max="20" step="1" value="8"></label>
+          <label class="sf-row"><span>FPS</span><select id="oFps"><option value="15">15</option><option value="24">24</option><option value="30">30</option><option value="60">60</option></select></label>
+          <p class="hint">Bitrate 8 Mbps dan 30 fps sudah cukup, kecuali PC kamu high-end.</p>
+          <p class="hint" id="oLive">Sekarang: capture mati</p>
+        </div>
+        <div class="box">
+          <h3>Discord</h3>
+          <p class="hint" id="dcSummary">Belum diatur. Bicara dideteksi dari kotak hijau di layar.</p>
+          <button id="dcOpen" class="btn small" type="button">Discord Deteksi Suara</button>
+        </div>
+        <div class="box" id="portBox" hidden>
+          <h3>Port server</h3>
+          <p class="hint">Ubah kalau port bentrok.</p>
+          <label class="sf-row"><span>Port</span><input type="text" id="portIn" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="5"></label>
+          <p class="hint" id="portInfo" role="status"></p>
+          <button id="portFind" class="btn small" type="button">Cari port kosong</button>
+          <button id="portApply" class="btn small" type="button">Terapkan</button>
+        </div>
+        <div class="box" id="keysBox" hidden>
+          <h3>Shortcut dan Stream Deck</h3>
+          <p class="hint">Ganti preset, template, dan deteksi bicara dari keyboard atau Stream Deck.</p>
+          <p class="hint" id="keysInfo" role="status"></p>
+          <button id="keysOpen" class="btn small" type="button">Atur shortcut</button>
+          <button id="deckInstall" class="btn small" type="button">Pasang plugin Stream Deck</button>
+          <p class="hint" id="deckInfo" role="status"></p>
+        </div>
+        <div class="box" id="bugBox" hidden>
+          <h3>Laporan bug</h3>
+          <p class="hint">Salin info, lalu kirim ke developer.</p>
+          <button id="bugCopy" class="btn small" type="button">Salin info</button>
+          <button id="bugLogs" class="btn small" type="button">Buka folder log</button>
+          <p class="hint" id="bugInfo" role="status"></p>
+          <p class="hint">Log tidak berisi token / secret Discord.</p>
+        </div>
+        <div class="box">
+          <h3>Gambar unggahan</h3>
+          <p class="hint" id="oUploads">Menghitung...</p>
+          <button id="oClean" class="btn small" type="button" disabled>Hapus gambar yang tidak dipakai</button>
+        </div>
+        <div class="box">
+          <h3>Dukung developer</h3>
+          <p class="hint">Waku gratis. Kalau membantu stream kamu, dukung pengembangannya:</p>
+          <a class="btn small primary support" href="https://saweria.co/Kurohiko" target="_blank" rel="noopener">Donasi di Saweria</a>
+          <a class="btn small primary support" href="https://kurohikotopup.com" target="_blank" rel="noopener">Top up game di KurohikoTopUp</a>
+        </div>
+        <p class="hint about">Waku <b id="oVersion">...</b></p>
+      </div>
+    </div>
+  </aside>
+
+  <section class="stage">
+    <div class="canvas-card">
+      <div class="card-title"><h2>Kanvas OBS</h2><small>1920 × 1080</small></div>
+      <div class="canvas-head">
+        <button id="capture" class="btn primary" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2.5"/><path d="M8 21h8M12 17v4"/></svg>Capture</button>
+        <button id="addSlot" class="btn" type="button" title="Tambah frame baru dan atur crop-nya (ukuran disalin dari frame terpilih). Edit frame yang ada lewat ikon pensil di tile."><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 9v6M9 12h6"/></svg>Tambah frame</button>
+        <button id="addVirtual" class="btn" type="button" title="Tambah frame dari gambar (bukan dari capture): tetap punya border, bayangan, dan efek bicara. Status bicara dari Discord."><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/></svg>Virtual frame</button>
+        <span class="sep"></span>
+        <button id="mainSize" class="btn" type="button" disabled title="Semua tile aktif jadi persis seukuran tile terpilih; rasio crop mereka ikut disamakan supaya video tidak gepeng. Bisa diurungkan."><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><path d="M15 4h6v6M21 4l-7 7M14 14h7v7h-7z"/></svg>Jadikan ukuran utama</button>
+        <button id="clearGuides" class="btn" type="button" disabled title="Tarik dari penggaris kiri atau atas untuk membuat guide. Tarik kembali ke penggaris untuk menghapus."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v18M3 8h18" stroke-dasharray="2 3"/><path d="M14 14l6 6M20 14l-6 6"/></svg>Hapus semua guide</button>
+        <button id="supportDev" class="btn support-dev" type="button" title="Dukung pengembangan Waku"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z"/><path d="M6 2v3M10 2v3M14 2v3"/></svg>Support Dev</button>
+      </div>
+      <div id="stageHost">
+        <div id="stageGrid">
+          <canvas id="rulerTop" class="ruler" title="Tarik ke bawah untuk membuat guide horizontal"></canvas>
+          <canvas id="rulerLeft" class="ruler" title="Tarik ke kanan untuk membuat guide vertikal"></canvas>
+          <div id="layoutStage"><div id="safeLayer" aria-hidden="true"></div><div id="layoutInner"></div>
+            <button id="quickBtn" class="btn icon" type="button" popovertarget="quickCfg" aria-label="Pengaturan cepat" title="Pengaturan cepat: susunan, video, label nama, efek bicara"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
+            <button id="safeBtn" class="btn icon" type="button" popovertarget="safeCfg" aria-pressed="false" aria-label="Safe zone game" title="Safe zone game: tampilkan area HUD (minimap, skill, chat, ronde) supaya tile tidak menutupinya"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div class="dock">
+      <div class="quick"><small>Preset</small><div id="quickPresets"><button id="moreBtn" class="btn" type="button" popovertarget="morePresets" hidden>Lainnya ▾</button></div></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="quickCfg" popover>
+  <h3>Susunan</h3>
+  <label class="sf-row"><span>Template</span><select id="qKind"></select></label>
+  <h3>Video ke OBS</h3>
+  <label class="sf-row"><span>Bitrate <b id="qBitrateVal"></b> Mbps</span><input type="range" id="qBitrate" min="2" max="20" step="1"></label>
+  <label class="sf-row"><span>FPS</span><select id="qFps"></select></label>
+  <div id="quickHost"></div>
+  <div id="qKeysRow" hidden>
+    <h3>Shortcut</h3>
+    <button id="qKeys" class="btn small" type="button">Atur shortcut</button>
+  </div>
+</div>
+
+<div id="morePresets" popover>
+  <h3>Preset lainnya</h3>
+  <div id="moreList"></div>
+  <p class="hint">Sematkan preset supaya tampil sebagai tombol di bawah kanvas. Tarik untuk mengubah urutan.</p>
+</div>
+<div id="safeCfg" popover>
+  <h3>Safe zone game</h3>
+  <div id="safeList"></div>
+  <p class="hint">Hanya tampil di editor, tidak ikut ke OBS. Posisi perkiraan untuk HUD bawaan.</p>
+</div>
+
+<aside class="help" id="help" aria-label="Persiapan sebelum live">
+  <div class="hh"><h2>Persiapan sebelum live</h2><span class="spacer"></span><button id="helpClose" class="btn icon" type="button" aria-label="Tutup"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <h3>Di Discord</h3>
+  <ul>
+    <li>Matikan <i>Show Non-Video Participants</i> (Tampilkan peserta tanpa video), supaya grid hanya berisi tile kamera.</li>
+    <li>Bagusnya klik kanan kamera kamu sendiri, lalu hilangkan centang <i>Show My Own Camera</i>.</li>
+    <li>Jangan ganti tema atau ukuran jendela Discord saat live; crop dan kotak deteksi bisa meleset.</li>
+    <li>Perhatikan Streamer Mode, karena bisa mengubah posisi overlay Discord.</li>
+  </ul>
+  <h3>Capture dan OBS</h3>
+  <ul>
+    <li>Klik <i>Capture</i>, lalu pilih jendela Discord (bertanda <i>Discord</i>). Jangan di-minimize (capture beku); boleh tertutup jendela lain.</li>
+    <li>Di OBS tambahkan Browser Source 1920x1080 dengan alamat preview di bar atas (tombol salin di sebelahnya).</li>
+    <li>Bitrate dan FPS diatur di tab <i>Atur</i>; angka yang benar-benar terkirim ke OBS tampil di sana.</li>
+  </ul>
+  <h3>Frame</h3>
+  <ul>
+    <li><i>Tambah frame</i>: atur kotak crop pas di area kamera orangnya, lalu Simpan. Ikon pensil di tile untuk mengedit lagi.</li>
+    <li><i>Virtual frame</i>: frame dari gambar (PNG, JPG, GIF, WebP), tanpa capture. Gambarnya bisa digeser dan di-zoom, dengan latar warna atau transparan.</li>
+    <li>Di kanvas: tarik tile untuk memindah, tarik sudutnya untuk ubah ukuran. Tahan Alt sambil menarik sudut atau sisi untuk memotong (crop) tanpa mengubah skala gambar.</li>
+    <li>Tombol kiri atas tile mengembalikan crop dan ukurannya; tempat sampah menghapus (klik dua kali). Ctrl+Z / Ctrl+Y untuk urungkan dan ulangi.</li>
+  </ul>
+  <h3>Deteksi bicara</h3>
+  <ul>
+    <li>Paling akurat: pakai API resmi Discord. Status bicara diambil langsung dari aplikasi Discord di PC ini, jadi tidak terganggu warna baju atau latar. Isi Client ID dan Client Secret sekali saja: <button id="helpDc" class="linkbtn" type="button">buka pengaturan Discord Deteksi Suara</button>.</li>
+    <li>Deteksi bicara diatur per frame di popup edit frame. Frame baru mulai <i>Nonaktif</i>.</li>
+    <li><i>Official</i>: setelah Discord tersambung (pill Discord di bar atas), pilih akun orangnya di voice Discord. Frame virtual hanya bisa lewat cara ini.</li>
+    <li><i>Manual</i>: geser kotak hijau (kotak deteksi) ke tempat outline hijau Discord muncul. Saat orang itu bicara, angka <i>Hijau terbaca</i> harus naik dan kotaknya menyala.</li>
+    <li>Kalau <i>Hijau terbaca</i> tinggi saat orang diam (baju, latar, atau green screen), geser kotaknya atau naikkan ambang di tab Deteksi.</li>
+  </ul>
+  <h3>Preset</h3>
+  <ul>
+    <li>Simpan susunan sekarang di tab <i>Preset</i>; tombol preset di bawah kanvas menerapkannya dalam satu klik.</li>
+    <li>Preset yang disematkan (ikon pin) tampil sebagai tombol di bawah kanvas; sisanya di menu <i>Lainnya</i>. Tarik tombol atau baris preset untuk mengubah urutan.</li>
+    <li>Centang <i>Simpan juga nama frame &amp; akun Discord</i> untuk teman mabar tetap. Tanpa centang, preset hanya menyimpan susunan.</li>
+    <li><i>Jadikan ukuran utama</i> membuat semua frame persis seukuran frame terpilih.</li>
+  </ul>
+</aside>
+
+<video id="src" muted playsinline></video>
+<dialog id="cropDialog" aria-labelledby="dlgTitle">
+  <div class="dlg-head"><h2 id="dlgTitle">Tambah / Edit Frame</h2><div id="dlgSlots"></div></div>
+  <div class="dlg-body">
+    <div class="dlg-main">
+      <div class="dlg-zoom" role="group" aria-label="Zoom">
+        <button id="zOut" class="btn small" type="button" title="Perkecil" aria-label="Perkecil">&minus;</button>
+        <input id="zRange" type="range" min="1" max="6" step="0.05" value="1" aria-label="Zoom" style="width:160px">
+        <b id="zVal">100%</b>
+        <button id="zIn" class="btn small" type="button" title="Perbesar" aria-label="Perbesar">+</button>
+        <button id="zFit" class="btn small" type="button" title="Muat satu layar">Pas</button>
+        <span class="hint">Ctrl + scroll untuk zoom</span>
+      </div>
+      <div id="dlgView">
+        <div id="dlgStage">
+          <canvas id="dlgCanvas" width="1920" height="1080"></canvas>
+          <div id="dlgEmpty"><span>Belum ada capture. Capture jendela Discord dulu supaya kotak crop bisa diatur.</span><button id="dlgCapture" class="btn small" type="button">Capture jendela Discord</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="dlg-side">
+      <label class="sf-row"><span>Nama</span><input id="dName" maxlength="40"></label>
+      <label title="Matikan untuk menyembunyikan frame dari kanvas tanpa menghapusnya. Nama dan sumber bicara tetap tersimpan."><input type="checkbox" id="dEnabled">Tampil di kanvas</label><br>
+      <div class="mode-row"><span>Deteksi bicara</span><span class="seg" id="dMode" role="group" aria-label="Deteksi bicara"><button type="button" data-mode="off" title="Frame ini tidak menyala saat bicara">Nonaktif</button><button type="button" data-mode="manual" title="Kotak hijau: menyala saat outline hijau Discord muncul di layar">Manual</button><button type="button" data-mode="discord" title="Status bicara langsung dari aplikasi Discord, tanpa kotak hijau">Official</button></span></div>
+      <label class="sf-row" id="dSourceRow" hidden title="Status bicara diambil langsung dari Discord untuk akun ini."><span>Akun Discord</span><select id="dSource"></select></label>
+      <label><input type="checkbox" id="dRatioLock">Kunci rasio crop</label><br>
+      <label><input type="checkbox" id="dCropLock">Kunci resize crop</label>
+      <div id="ratioRow"><span id="ratioLabel">Hijau terbaca:</span> <b id="ratio">-</b></div>
+      <label class="sf-row"><span>Ambang <b id="dGreenVal"></b></span><input type="range" id="dGreen" min="0.005" max="1" step="0.005"></label>
+      <button id="dProbeReset" class="btn small" type="button">Taruh kotak deteksi di sudut crop</button>
+      <p class="hint">Kotak crop = area kamera. Hijau = kotak deteksi, taruh di tepi tile yang menyala saat bicara. Tarik sudut untuk ubah ukuran; tahan Alt untuk rasio bebas dan mematikan magnet.</p>
+      <button id="dlgDelete" class="btn small" type="button">Hapus frame</button>
+    </div>
+  </div>
+  <div class="dlg-foot"><button id="dlgCancel" class="btn" type="button">Batal</button><button id="dlgSave" class="btn" type="button">Simpan</button></div>
+</dialog>
+<dialog id="vDialog" aria-labelledby="vTitle">
+  <div class="dlg-head"><h2 id="vTitle">Tambah virtual frame</h2></div>
+  <div class="v-body">
+    <div class="v-main">
+      <div id="vView" class="v-view">
+        <div id="vStage" class="v-stage" hidden></div>
+        <button id="vDrop" class="v-drop" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+          <b>Pilih gambar</b><span>atau seret file ke sini</span><small>PNG, JPG, GIF bergerak, WebP · maks 8 MB</small>
+        </button>
+      </div>
+      <div class="v-tools" id="vTools" hidden>
+        <button id="vZoomOut" class="btn small" type="button" aria-label="Perkecil">&minus;</button>
+        <input id="vZoom" type="range" min="0.2" max="5" step="0.01" value="1" aria-label="Zoom gambar">
+        <button id="vZoomIn" class="btn small" type="button" aria-label="Perbesar">+</button>
+        <button id="vFit" class="btn small" type="button" title="Seluruh gambar muat di dalam frame">Pas</button>
+        <button id="vReplace" class="btn small" type="button">Ganti gambar</button>
+        <span class="hint">Seret gambar untuk menggeser, scroll untuk zoom</span>
+      </div>
+      <input type="file" id="vFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+    </div>
+    <div class="dlg-side">
+      <label class="sf-row"><span>Nama</span><input id="vName" maxlength="40"></label>
+      <label class="sf-row"><span>Sumber bicara</span><select id="vSource"></select></label>
+      <div class="sf-row"><span>Background</span><span class="v-bg"><input type="color" id="vBg" value="#000000" aria-label="Warna background"><label><input type="checkbox" id="vBgNone">Transparan</label></span></div>
+      <p class="hint">Border, bayangan, dan efek bicara ikut gaya frame. Status bicara diambil dari Discord.</p>
+      <p class="hint" id="vErr" role="alert" hidden></p>
+    </div>
+  </div>
+  <div class="dlg-foot"><button id="vCancel" class="btn" type="button">Batal</button><button id="vSave" class="btn primary" type="button">Simpan</button></div>
+</dialog>
+<dialog id="dcDlg" aria-labelledby="dcTitle">
+  <div class="dlg-head"><h2 id="dcTitle">Discord Deteksi Suara</h2></div>
+  <div class="dc-body">
+    <p class="hint">Opsional. Dengan API resmi dari Discord, Waku bisa memakai fitur pendeteksi suara yang akurat. Aman, karena fitur ini memang disediakan resmi oleh Discord.</p>
+    <ol class="hint steps">
+      <li>Buka <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">Discord Developer Portal</a>, klik <b>New Application</b>, lalu beri nama aplikasinya. Nama tidak boleh mengandung kata "discord".</li>
+      <li>Klik menu <b>OAuth2</b>. Copy <b>Client ID</b> dan masukkan ke kolom Client ID di bawah.</li>
+      <li>Klik <b>Reset Secret</b> &gt; <b>Yes, do it!</b>, copy <b>Client Secret</b>, lalu masukkan ke kolom Client Secret.</li>
+      <li>Masih di halaman yang sama, di bagian <b>Redirects</b> klik <b>Add Redirect</b>, ketik <code>http://localhost</code>, lalu klik <b>Save Changes</b>.</li>
+    </ol>
+    <label class="sf-row"><span>Client ID</span><input type="text" id="dcId" inputmode="numeric" autocomplete="off" spellcheck="false"></label>
+    <label class="sf-row"><span>Client Secret</span><input type="password" id="dcSecret" autocomplete="off" spellcheck="false"></label>
+    <p class="hint" id="dcInfo" role="status"></p>
+    <p class="hint">Secret hanya disimpan di PC ini dan tidak pernah ditampilkan lagi.</p>
+  </div>
+  <div class="dlg-foot"><button id="dcClear" class="btn" type="button" hidden>Hapus</button><span class="grow"></span><button id="dcClose" class="btn" type="button">Tutup</button><button id="dcSave" class="btn primary" type="button">Simpan &amp; sambungkan</button></div>
+</dialog>
+<dialog id="keysDlg" aria-labelledby="keysTitle">
+  <div class="dlg-head"><h2 id="keysTitle">Shortcut</h2></div>
+  <div class="dc-body">
+    <p class="hint">Tambah shortcut, pilih aksinya, lalu klik Atur tombol dan tekan kombinasinya (misalnya Ctrl+Alt+1). Berlaku di mana saja, walau Waku tersembunyi di tray. Untuk Stream Deck, pakai aksi <b>Hotkey</b> dengan kombinasi yang sama.</p>
+    <div id="keysList"></div>
+    <p class="hint" id="keysDlgInfo" role="status"></p>
+  </div>
+  <div class="dlg-foot"><button id="keysAdd" class="btn" type="button">Tambah shortcut</button><span class="grow"></span><button id="keysClose" class="btn" type="button">Tutup</button><button id="keysSave" class="btn primary" type="button">Simpan</button></div>
+</dialog>
+<dialog id="supportDlg" aria-labelledby="supportTitle">
+  <div class="dlg-head"><h2 id="supportTitle">Support Developer</h2></div>
+  <div class="dc-body">
+    <p class="hint">Support developer dalam pengembangan aplikasi.</p>
+    <a class="btn small primary support" href="https://saweria.co/Kurohiko" target="_blank" rel="noopener">Donate: Saweria Kurohiko</a>
+    <a class="btn small primary support" href="https://kurohikotopup.com" target="_blank" rel="noopener">Top up game murah di KurohikoTopUp.com</a>
+  </div>
+  <div class="dlg-foot"><span class="grow"></span><button id="supportClose" class="btn" type="button">Tutup</button></div>
+</dialog>
+<dialog id="busyDlg" aria-labelledby="busyTitle">
+  <h2 id="busyTitle">Waku sedang dibuka di tab lain</h2>
+  <p id="busyMsg"></p>
+  <button id="busyTake" class="btn primary" type="button">Pakai tab ini</button>
+</dialog>
+<script type="module" src="/control.js"></script>
+</body>
+</html>

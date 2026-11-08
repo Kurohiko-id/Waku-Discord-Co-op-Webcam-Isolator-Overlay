@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "UUID": "id.kurohiko.waku",
+  "Name": "Waku",
+  "Version": "1.0.0.0",
+  "Author": "Kurohiko",
+  "Description": "Control Waku (Discord co-op webcam overlay for OBS): switch presets and templates, toggle speaking detection.",
+  "Icon": "imgs/plugin",
+  "Category": "Waku",
+  "CategoryIcon": "imgs/category",
+  "CodePath": "bin/plugin.js",
+  "SDKVersion": 2,
+  "Software": { "MinimumVersion": "6.5" },
+  "OS": [{ "Platform": "windows", "MinimumVersion": "10" }],
+  "Nodejs": { "Version": "20" },
+  "Actions": [
+    {
+      "UUID": "id.kurohiko.waku.preset",
+      "Name": "Preset",
+      "Tooltip": "Apply a saved Waku preset",
+      "Icon": "imgs/action-preset",
+      "PropertyInspectorPath": "ui/preset.html",
+      "States": [{ "Image": "imgs/key-preset", "TitleAlignment": "bottom", "FontSize": 11 }],
+      "Controllers": ["Keypad"]
+    },
+    {
+      "UUID": "id.kurohiko.waku.template",
+      "Name": "Template",
+      "Tooltip": "Switch to a template, or to the next one",
+      "Icon": "imgs/action-template",
+      "PropertyInspectorPath": "ui/template.html",
+      "States": [{ "Image": "imgs/key-template", "TitleAlignment": "bottom", "FontSize": 11 }],
+      "Controllers": ["Keypad"]
+    },
+    {
+      "UUID": "id.kurohiko.waku.detect",
+      "Name": "Speaking detection",
+      "Tooltip": "Turn speaking detection on or off (shows the current state)",
+      "Icon": "imgs/action-detect",
+      "PropertyInspectorPath": "ui/detect.html",
+      "DisableAutomaticStates": true,
+      "States": [
+        { "Image": "imgs/key-detect-on", "TitleAlignment": "bottom", "FontSize": 11 },
+        { "Image": "imgs/key-detect-off", "TitleAlignment": "bottom", "FontSize": 11 }
+      ],
+      "Controllers": ["Keypad"]
+    }
+  ]
+}

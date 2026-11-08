@@ -1,0 +1,53 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:">
+<title>Waku</title>
+<style>
+  :root { color-scheme: dark; --bg: #111; --surface: #1a1a1a; --line: #2c2c2c; --ink: #ececec; --ink2: #a8a8a8; --accent: #efe6cf; --accent-ink: #141414; }
+  * { box-sizing: border-box; }
+  body { margin: 0; height: 100vh; display: flex; flex-direction: column; background: var(--bg); color: var(--ink); font: 13.5px system-ui, "Segoe UI", sans-serif; }
+  header { padding: 16px 20px 6px; }
+  h1 { margin: 0; font-size: 15px; font-weight: 600; }
+  .hint { margin: 4px 0 0; color: var(--ink2); font-size: 12.5px; }
+  main { flex: 1; overflow: auto; padding: 12px 20px; }
+  h2 { margin: 14px 0 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+  .src { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .src:hover { border-color: #555; }
+  .src[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .src:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .thumb { aspect-ratio: 16 / 10; width: 100%; border-radius: 4px; background: #000; object-fit: contain; }
+  .name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .name img { width: 16px; height: 16px; flex: none; }
+  .name span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .tag { margin-left: auto; flex: none; padding: 1px 6px; border-radius: 99px; background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 700; }
+  footer { display: flex; gap: 8px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--line); }
+  footer .grow { flex: 1; }
+  button.btn { min-height: 34px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font: 600 13.5px system-ui, "Segoe UI", sans-serif; cursor: pointer; }
+  button.btn:hover { border-color: #555; }
+  button.primary { background: var(--accent); border-color: transparent; color: var(--accent-ink); }
+  button.primary:disabled { opacity: .5; cursor: default; }
+  .empty { color: var(--ink2); }
+  button.btn:disabled { opacity: .5; cursor: default; }
+  /* kartu sementara selama daftar jendela dimuat */
+  .skel { aspect-ratio: 16 / 12.5; border-radius: 8px; border: 1px solid var(--line); background: linear-gradient(100deg, var(--surface) 30%, #262626 50%, var(--surface) 70%) 0 0 / 300% 100%; animation: shimmer 1.2s linear infinite; }
+  @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+  @media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
+</style>
+<header>
+  <h1 data-t="title"></h1>
+  <p class="hint" data-t="hint"></p>
+</header>
+<main>
+  <h2 data-t="windows"></h2>
+  <div class="grid" id="windows"></div>
+  <h2 data-t="screens"></h2>
+  <div class="grid" id="screens"></div>
+</main>
+<footer>
+  <button class="btn" id="refresh" type="button" data-t="refresh"></button>
+  <span class="grow"></span>
+  <button class="btn" id="cancel" type="button" data-t="cancel"></button>
+  <button class="btn primary" id="ok" type="button" data-t="ok" disabled></button>
+</footer>
+<script src="picker.js"></script>
