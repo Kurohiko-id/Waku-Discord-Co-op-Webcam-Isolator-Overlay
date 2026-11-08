@@ -1,8 +1,8 @@
 import { connect } from '/shared/ws.js';
-import { newSlot, newSlotFrom, nextSlotName, presetOrder, mergeDraft, presetSlots, applyPresetSlots } from '/shared/layout.js';
-import { snapRect, alignedLines, ratioHeight, clampRect, resizeKeepRatio, resizeCorner, cropFromTile } from '/shared/geometry.js';
+import { newSlot, newSlotFrom, nextSlotName, presetOrder, mergeDraft, presetSlots, applyPresetSlots, virtualLibrary, rememberVirtual, forgetVirtual, withVirtualSources, rescaleSlots } from '/shared/layout.js';
+import { snapRect, snapSpacing, alignedLines, ratioHeight, clampRect, resizeCorner, cropFromTile } from '/shared/geometry.js';
 import { attachDrag } from '/shared/drag.js';
-import { place, showGuides, showMatch, addCorners } from '/editor-dom.js';
+import { place, showGuides, showMatch, showGaps, addCorners } from '/editor-dom.js';
 import { createCropDialog } from '/crop-dialog.js';
 import { createVirtualDialog } from '/virtual-dialog.js';
 import { greenFraction, createDebouncer } from '/shared/speaking.js';
@@ -13,14 +13,15 @@ import { sameSize, sameRatio, toGrid, autoLayout } from '/shared/bulk.js';
 import { buildTile, updateTile } from '/shared/tile-dom.js';
 import { Stat, createLogger, watchIce } from '/shared/log.js';
 import { iceDone } from '/shared/rtc.js';
-import { startI18n, setLang, getLang } from '/shared/i18n.js';
+import { createPresetIoDialogs } from '/preset-io-dialog.js';
+import { startI18n, setLang, getLang, original } from '/shared/i18n.js';
 
 const $ = id => document.getElementById(id);
 const video = $('src');
 const CANVAS = { w: 1920, h: 1080 };
 const SNAP = 16;
 
-let layout = { slots: [], settings: { animate: true, greenMin: 0.02, detectEnabled: true }, style: defaultStyle(), template: 'sticker-night', guides: { x: [], y: [] }, presets: [] };
+let layout = { slots: [], settings: { animate: true, greenMin: 0.02, detectEnabled: true }, style: defaultStyle(), template: 'sticker-night', guides: { x: [], y: [] }, presets: [], library: [] };
 let selected = null;
 let stream = null;
 let pc = null;
@@ -80,8 +81,9 @@ $('copyUrl').onclick = async () => {
 };
 
 function onMsg(msg) {
-  if (msg.type === 'layout') { layout = msg.layout; layout.guides ??= { x: [], y: [] }; layout.presets ??= []; savedJson = JSON.stringify(layout); render(); } // titik awal riwayat
-  else if (msg.type === 'ready') offer();
+  if (msg.type === 'layout') { layout = msg.layout; layout.guides ??= { x: [], y: [] }; layout.presets ??= []; layout.library ??= []; savedJson = JSON.stringify(layout); render(); } // titik awal riwayat
+  else if (msg.type === 'ready') { previewVisible = true; offer(); } // preview (baru) melapor sendiri bila tersembunyi
+  else if (msg.type === 'visible') setPreviewVisible(msg.on);
   else if (msg.type === 'discord') onDiscord(msg);
   else if (msg.type === 'info') $('oVersion').textContent = 'v' + msg.version;
   else if (msg.type === 'uploads') showUploads(msg);
@@ -110,7 +112,7 @@ for (const [key, t] of Object.entries(TEMPLATES)) $('gTemplate').append(new Opti
 function onGeneralStyle(group, patch) {
   const next = group === 'radius' ? { radius: patch } : { [group]: patch };
   layout.style = mergeStyle(layout.style, validatePartialStyle(next));
-  restyleAll(); // dropdown template tetap menampilkan template terakhir yang dipilih (sesuai spec)
+  restyleAll(); // dropdown template tetap menampilkan template terakhir yang dipilih
   fillSlotStyle();
   commitSoon();
 }
@@ -171,16 +173,17 @@ function fillSlotStyle() {
   if (s) slotForm.update(slotStyle(s), overridden(s));
 }
 // ---- aksi massal: slider langsung berlaku; selalu dihitung dari kondisi sebelum sesi, jadi bisa diurungkan ----
-const bulk = { snapshot: null, width: false, ratio: null, grid: false, auto: null }; // auto = { kind, gap }
+const bulk = { snapshot: null, width: false, ratio: null, grid: false, auto: null, preset: false }; // auto = { kind, gap }; preset = snapshot milik Urungkan preset
 let bulkTimer;
 function resetBulk() {
-  bulk.snapshot = null; bulk.width = false; bulk.ratio = null; bulk.grid = false; bulk.auto = null;
+  bulk.snapshot = null; bulk.width = false; bulk.ratio = null; bulk.grid = false; bulk.auto = null; bulk.preset = false;
   $('aKind').value = '';
   setUndo(false);
 }
 const setUndo = on => { for (const id of ['bUndo', 'pUndo', 'aUndo']) $(id).disabled = !on; };
 function runBulk() {
-  if (!bulk.snapshot) { bulk.snapshot = structuredClone(layout.slots); setUndo(true); }
+  // setelah preset diterapkan, snapshot masih layout sebelum preset (untuk Urungkan): aksi massal harus mulai dari layout sekarang
+  if (!bulk.snapshot || bulk.preset) { bulk.snapshot = structuredClone(layout.slots); bulk.preset = false; setUndo(true); }
   let slots = structuredClone(bulk.snapshot);
   if (bulk.ratio) slots = sameRatio(slots, bulk.ratio, frame(), CANVAS);
   if (bulk.auto) slots = autoLayout(slots, bulk.auto.kind, bulk.auto.gap, CANVAS);
@@ -253,19 +256,28 @@ function renderPresets() {
     row.className = 'preset';
     row.title = 'Tarik untuk mengubah urutan';
     sortablePreset(row, p);
+    // baris 1: nama + Terapkan; baris 2: info satu baris (+ shortcut) + Timpa / Hapus
     const title = document.createElement('b');
-    const count = document.createElement('small');
+    title.className = 'pname';
+    title.textContent = p.name || 'Tanpa nama';
+    title.title = title.textContent; // nama panjang terpotong: lengkapnya saat disorot
+    const meta = document.createElement('small');
+    meta.className = 'pmeta';
+    const info = document.createElement('span');
+    info.textContent = p.slots.length + ' frame · ' + (p.full ? 'dengan akun' : 'susunan saja');
+    info.title = p.full ? 'Nama frame dan akun Discord ikut tersimpan' : 'Hanya susunan; saat dipakai, frame jadi DC 1, DC 2, ...';
+    meta.append(info);
     const key = appShortcuts.find(s => s.action.type === 'preset' && s.action.id === p.id)?.key;
-    count.textContent = p.slots.length + ' frame' + (key ? ' · ' + keyLabel(key) : '');
-    const kind = document.createElement('small');
-    kind.textContent = p.full ? 'nama & akun ikut' : 'susunan saja';
-    title.append(p.name || 'Tanpa nama', count, kind);
-    row.append(title,
-      presetBtn('Terapkan', () => applyPreset(p)),
+    if (key) { const k = document.createElement('kbd'); k.textContent = keyLabel(key); k.title = 'Shortcut'; meta.append(k); }
+    const acts = document.createElement('span');
+    acts.className = 'pacts';
+    row.append(title, presetBtn('Terapkan', () => applyPreset(p), 'apply'), meta, acts);
+    acts.append(
       presetBtn('Timpa', b => {
         if (!layout.slots.length) return setStatus('Belum ada frame untuk disimpan');
         armed(b, 'Timpa', 'Klik lagi untuk menimpa', () => {
           p.slots = presetSlots(layout.slots, p.full);
+          Object.assign(p, capturedSize());
           commit();
           renderPresets();
           setStatus('Preset diperbarui');
@@ -355,23 +367,40 @@ $('morePresets').addEventListener('beforetoggle', e => {
   const r = $('moreBtn').getBoundingClientRect();
   Object.assign($('morePresets').style, { left: r.left + 'px', bottom: innerHeight - r.top + 6 + 'px' });
 });
-function applyPreset(p) {
+// Gambar unggahan yang filenya sudah tidak ada di server (mis. folder data dihapus manual). Gagal menghubungi server = anggap ada.
+async function missingImages(slots) {
+  const urls = [...new Set(slots.filter(s => s.image).map(s => s.image))];
+  const ok = await Promise.all(urls.map(u => fetch(u, { method: 'HEAD' }).then(r => r.ok, () => true)));
+  return new Set(urls.filter((_, i) => !ok[i]));
+}
+// Ukuran capture yang dipakai crop sekarang (untuk preset); tanpa capture: ukuran terakhir yang diketahui.
+const capturedSize = () => (video.videoWidth ? { frameW: video.videoWidth, frameH: video.videoHeight } : { frameW: layout.settings.frameW, frameH: layout.settings.frameH });
+async function applyPreset(p) {
+  for (const s of layout.slots) if (s.image) layout.library = rememberVirtual(layout.library, s); // virtual frame yang hilang dari kanvas tetap tersimpan
+  // crop preset dibuat untuk ukuran capture saat disimpan: skalakan dulu ke capture sekarang (hanya slot dari preset)
+  const scaled = p.frameW && video.videoWidth ? { ...p, slots: rescaleSlots(p.slots, { w: p.frameW, h: p.frameH }, frame()) } : p;
+  let next = withVirtualSources(applyPresetSlots(scaled, layout.slots), layout.library)
+    .map(s => ({ ...s, crop: s.image ? s.crop : clampRect(s.crop, frame()), probe: clampRect(s.probe, frame()), place: clampRect(s.place, CANVAS) }));
+  const gone = await missingImages(next); // frame tanpa gambar dilewati, bukan jadi kotak kosong di OBS
+  if (gone.size) next = next.filter(s => !gone.has(s.image));
   resetBulk();
   bulk.snapshot = structuredClone(layout.slots); // supaya bisa diurungkan
+  bulk.preset = true;
   setUndo(true);
   for (const [id, on] of speaking) if (on) ws.send({ type: 'speaking', slotId: id, speaking: false });
   speaking.clear(); debouncers.clear(); lastRatio.clear();
-  layout.slots = applyPresetSlots(p, layout.slots).map(s => ({ ...s, crop: s.image ? s.crop : clampRect(s.crop, frame()), probe: clampRect(s.probe, frame()), place: clampRect(s.place, CANVAS) }));
+  layout.slots = next;
   if (!layout.slots.some(s => s.id === selected)) selected = null;
   render();
   sendLayout();
-  setStatus('Preset "' + (p.name || 'Tanpa nama') + '" diterapkan');
+  const name = p.name || 'Tanpa nama';
+  setStatus(gone.size ? 'Preset "' + name + '" diterapkan · ' + gone.size + ' virtual frame gambarnya hilang' : 'Preset "' + name + '" diterapkan');
 }
 $('pSave').onclick = () => {
   if (!layout.slots.length) return setStatus('Belum ada frame untuk disimpan');
   if (layout.presets.length >= 20) return setStatus('Maksimal 20 preset');
   const full = $('pFull').checked;
-  layout.presets.push({ id: 'p' + Date.now().toString(36), name: $('pName').value.trim() || 'Preset ' + (layout.presets.length + 1), slots: presetSlots(layout.slots, full), pinned: false, full });
+  layout.presets.push({ id: 'p' + Date.now().toString(36), name: $('pName').value.trim() || 'Preset ' + (layout.presets.length + 1), slots: presetSlots(layout.slots, full), pinned: false, full, ...capturedSize() });
   $('pName').value = '';
   commit();
   renderPresets();
@@ -386,7 +415,12 @@ $('slotStyleReset').onclick = () => {
   fillSlotStyle();
   commit();
 };
-const setStatus = t => { $('status').textContent = t; };
+let statusTimer = 0;
+function setStatus(t, sticky = false) {
+  clearTimeout(statusTimer);
+  $('status').textContent = t;
+  if (t && !sticky) statusTimer = setTimeout(() => { $('status').textContent = ''; }, 5000);
+}
 function chips() { // status Capture dan Deteksi di bar atas
   const set = (id, on, yes, no) => { $(id).textContent = on ? yes : no; $(id).className = on ? 'on' : 'off'; };
   if (!$('capture').classList.contains('busy')) set('capState', !!stream, 'aktif', 'mati'); // sedang disiapkan: tetap "menyiapkan..."
@@ -455,7 +489,7 @@ function stopCapture() {
 function captureBusy(text) {
   for (const b of [$('capture'), $('dlgCapture')]) { b.disabled = !!text; b.classList.toggle('busy', !!text); b.setAttribute('aria-busy', String(!!text)); }
   if (!text) return chips();
-  setStatus(text);
+  setStatus(text, true); // proses capture: tetap tampil sampai selesai
   $('capState').textContent = 'menyiapkan...';
   $('capState').className = 'wait';
 }
@@ -535,12 +569,26 @@ async function offer() {
     for (const sender of mine.getSenders()) {
       const p = sender.getParameters();
       // bawaan 8 Mbps: cukup untuk 1080p lokal; lebih tinggi hanya membebani encoder (diatur di tab Atur)
-      if (p.encodings?.length) { p.encodings[0].maxBitrate = layout.settings.bitrate * 1_000_000; p.degradationPreference = 'maintain-resolution'; await sender.setParameters(p); }
+      if (p.encodings?.length) { p.encodings[0].maxBitrate = layout.settings.bitrate * 1_000_000; p.encodings[0].active = previewVisible; p.degradationPreference = 'maintain-resolution'; await sender.setParameters(p); }
     }
   } catch (e) { log('sender_params_error', { msg: String(e?.message).slice(0, 120) }); } // bitrate default bila ditolak
   await iceDone(mine);
   if (pc !== mine) return; // offer() lain mengambil alih selagi menunggu
   ws.send({ type: 'signal', data: { sdp: mine.localDescription, id } });
+}
+
+// Browser Source OBS tidak tampil (scene lain): encoder dijeda, tidak meng-encode frame yang akan dibuang.
+let previewVisible = true;
+function setPreviewVisible(on) {
+  if (on === previewVisible) return;
+  previewVisible = on;
+  log('preview_visible', { on });
+  for (const sender of pc?.getSenders() ?? []) {
+    const p = sender.getParameters();
+    if (!p.encodings?.length) continue;
+    p.encodings[0].active = on;
+    sender.setParameters(p).catch(err => log('sender_params_error', { msg: String(err?.message).slice(0, 120) }));
+  }
 }
 
 async function onSignal(d) {
@@ -723,6 +771,7 @@ function render() {
     reset.onclick = () => {
       select(s.id);
       s.crop = s.image ? { ...s.baseCrop } : clampRect(s.baseCrop ?? s.crop, frame()); // virtual: tanpa batas capture
+      if (!s.image) markFrame();
       s.place = clampRect({ ...s.place, w: TILE_W, h: ratioHeight(TILE_W, s.crop) }, CANVAS);
       commit(); render();
     };
@@ -743,8 +792,21 @@ function render() {
       move: (r, alt) => {
         const others = layout.slots.filter(o => o !== s && o.enabled).map(o => o.place);
         const sn = alt ? { x: r.x, y: r.y, guides: { x: [], y: [] } } : snapRect(r, others, CANVAS, SNAP, layout.guides);
+        // Jarak sama dengan jarak antar frame lain (atau tengah di antara dua frame): menang bila lebih dekat dari magnet tepi.
+        const gaps = [];
+        if (!alt) {
+          const sp = snapSpacing(r, others, SNAP);
+          for (const a of ['x', 'y']) {
+            const edge = Math.abs(sn[a] - r[a]);
+            if (!sp[a] || (sn.guides[a].length && Math.abs(sp[a].d) > edge)) continue;
+            if (!sn.guides[a].length || Math.abs(sp[a].d) < edge) sn.guides[a] = []; // seri: garis tepi tetap tampil
+            sn[a] = r[a] + sp[a].d;
+            gaps.push(...sp[a].marks);
+          }
+        }
         s.place = { ...r, x: sn.x, y: sn.y };
         showGuides(withAligned(sn.guides, s.place, others), $('layoutInner'), 1);
+        showGaps($('layoutInner'), 1, gaps);
         positionAll(); commitSoon();
       },
       // Alt (atau tarik sisi): potong seperti di OBS, bingkai bergeser dan gambar kamera tetap di skalanya.
@@ -753,6 +815,7 @@ function render() {
         const others = layout.slots.filter(o => o !== s && o.enabled);
         if (alt || corner.length === 1) {
           ({ place: s.place, crop: s.crop } = cropFromTile(r, placeStart, cropStart, s.image ? null : frame())); // virtual: boleh melewati tepi gambar
+          if (!s.image) markFrame();
           if (s.image) updateTile(tile, s, slotStyle(s)); // frame virtual: posisi gambar ikut crop baru
           showGuides({ x: [], y: [] }, $('layoutInner'), 1); showMatch($('layoutInner'), 1, null);
           positionAll();
@@ -769,7 +832,7 @@ function render() {
         showMatch($('layoutInner'), 1, s.place, sn.matchIndex === null ? null : others[sn.matchIndex].place);
         positionAll(); commitSoon();
       },
-      end: () => { showGuides({ x: [], y: [] }, $('layoutInner'), 1); showMatch($('layoutInner'), 1, null); commit(); },
+      end: () => { showGuides({ x: [], y: [] }, $('layoutInner'), 1); showMatch($('layoutInner'), 1, null); showGaps($('layoutInner'), 1, []); commit(); },
     });
   }
   renderGuides();
@@ -777,6 +840,7 @@ function render() {
   fillForm();
   fillGeneral();
   renderPresets();
+  renderLibInfo();
   $('sAnimate').checked = layout.settings.animate;
   $('oBitrate').value = layout.settings.bitrate;
   $('oBitrateVal').textContent = layout.settings.bitrate;
@@ -800,6 +864,7 @@ function select(id) {
 }
 
 function deleteSlot(id) {
+  layout.library = rememberVirtual(layout.library, layout.slots.find(s => s.id === id)); // virtual frame tetap ada di daftar
   layout.slots = layout.slots.filter(s => s.id !== id);
   if (selected === id) selected = null;
   setSpeaking(id, false); // preview dan server tidak boleh menyimpan glow slot yang sudah dihapus
@@ -838,6 +903,23 @@ function makeNewSlot(slots, src) {
 const vRef = () => layout.slots.find(s => s.id === selected && s.enabled) ?? layout.slots.find(s => s.enabled);
 const virtualDlg = createVirtualDialog({
   slots: () => layout.slots, ref: vRef, discord: () => discord,
+  library: () => virtualLibrary(layout),
+  // pakai lagi dari daftar: yang tersembunyi ditampilkan, yang tidak ada ditambahkan di posisi terakhirnya
+  onPick(v) {
+    const cur = layout.slots.find(x => x.id === v.id);
+    if (cur) { cur.enabled = true; selected = cur.id; commit(); render(); return setStatus('Virtual frame ditampilkan lagi'); }
+    if (layout.slots.length >= 16) return setStatus('Maksimal 16 frame');
+    const [s] = withVirtualSources([{ ...structuredClone(v), enabled: true, place: clampRect(v.place, CANVAS) }], layout.library);
+    layout.slots.push(s);
+    selected = s.id;
+    commit(); render();
+  },
+  onForget(id) { // hapus permanen (yang tersembunyi di kanvas juga ikut)
+    Object.assign(layout, forgetVirtual(layout, id));
+    layout.slots = layout.slots.filter(s => s.id !== id || s.enabled);
+    if (selected === id) selected = null;
+    commit(); render();
+  },
   onSave({ id, ...fields }) {
     let s = layout.slots.find(x => x.id === id);
     if (!s) {
@@ -848,6 +930,7 @@ const virtualDlg = createVirtualDialog({
       layout.slots.push(s);
     } else s.place = clampRect({ ...s.place, h: ratioHeight(s.place.w, fields.crop) }, CANVAS);
     Object.assign(s, fields, { baseCrop: { ...fields.crop } });
+    layout.library = rememberVirtual(layout.library, s);
     selected = s.id;
     commit(); render();
   },
@@ -863,6 +946,7 @@ const cropDlg = createCropDialog({
   discord: () => discord,
   onSave({ slots, greenMin, selectedId }) {
     const merged = mergeDraft(layout.slots, slots, frame(), CANVAS);
+    markFrame(); // crop baru diatur di capture ini
     const kept = new Set(merged.map(s => s.id));
     for (const s of layout.slots) if (!kept.has(s.id)) { speaking.delete(s.id); debouncers.delete(s.id); lastRatio.delete(s.id); }
     layout.slots = merged;
@@ -928,31 +1012,37 @@ function restartTick() {
   tickReq = video.requestVideoFrameCallback(tick);
 }
 
-// Frame Discord bisa berubah ukuran: tahan semua crop di dalam frame baru.
-// Rasio crop yang dikunci tetap utuh (clampRect memotong lebar dan tinggi terpisah).
-function clampCrop(s, f) {
-  const c = clampRect(s.crop, f);
-  if (!s.ratioLocked || (c.w === s.crop.w && c.h === s.crop.h)) return c;
-  const ratio = s.crop.w / s.crop.h;
-  return resizeKeepRatio({ ...c, w: Math.min(c.w, c.h * ratio) }, ratio, f);
+// Crop disimpan dalam piksel capture, dengan ukuran capture tempat crop itu dibuat (settings.frameW/H) sebagai acuan.
+// Crop baru diatur di capture sekarang: capture ini jadi acuan baru.
+function markFrame() {
+  if (video.videoWidth) { layout.settings.frameW = video.videoWidth; layout.settings.frameH = video.videoHeight; clearResizeNote(); }
 }
+// Ukuran capture berubah (jendela Discord di-resize atau pindah monitor). Crop tidak pernah dijepit lalu disimpan:
+// itu permanen, jadi setelah ukuran jendela dikembalikan crop sudah rusak.
+// - rasio sama: Discord menskalakan isinya, jadi crop dan kotak deteksi ikut diskalakan, lalu capture ini jadi acuan.
+// - rasio beda: Discord menyusun ulang isinya dan tidak bisa diikuti. Crop dan acuan dibiarkan, jadi crop pas lagi
+//   begitu ukuran jendela dikembalikan (bagian crop di luar capture tidak digambar).
+const RESIZE_NOTE = 'Ukuran jendela Discord berubah. Kembalikan ukurannya, atau atur ulang crop.';
+const clearResizeNote = () => { if (original($('status')) === RESIZE_NOTE) setStatus(''); }; // crop sudah pas lagi (teks asli, bukan terjemahan)
 function reclamp() {
-  if (!video.videoWidth) return; // tanpa frame, frame() hanya tebakan 1920x1080: jangan potong crop berdasarkan tebakan
-  let changed = false;
-  for (const s of layout.slots) {
-    if (s.image) continue; // frame virtual tidak bergantung pada ukuran capture
-    const pr = clampRect(s.probe, frame());
-    if (pr.x !== s.probe.x || pr.y !== s.probe.y || pr.w !== s.probe.w || pr.h !== s.probe.h) { s.probe = pr; changed = true; }
-    const c = clampCrop(s, frame());
-    if (c.x !== s.crop.x || c.y !== s.crop.y || c.w !== s.crop.w || c.h !== s.crop.h) {
-      s.crop = c;
-      s.place.h = ratioHeight(s.place.w, c);
-      changed = true;
-    }
+  if (!video.videoWidth) return; // tanpa frame, frame() hanya tebakan 1920x1080
+  const f = frame(), ref = { w: layout.settings.frameW, h: layout.settings.frameH };
+  if (!ref.w) { markFrame(); commit(); return; } // layout lama: anggap crop dibuat untuk capture ini
+  if (ref.w === f.w && ref.h === f.h) { clearResizeNote(); positionAll(); return; } // kembali ke ukuran acuan: crop sudah pas
+  const next = rescaleSlots(layout.slots, ref, f);
+  const scaled = next !== layout.slots;
+  log('frame_resize', { from: ref.w + 'x' + ref.h, to: f.w + 'x' + f.h, scaled });
+  if (!scaled) {
+    setStatus(RESIZE_NOTE, true);
+    positionAll();
+    return;
   }
-  cropDlg.reclamp(); // popup terbuka saat ukuran frame berubah
+  layout.slots = next;
+  markFrame();
+  clearResizeNote();
+  cropDlg.reclamp(f.w / ref.w); // popup terbuka: draft ikut diskalakan
   positionAll();
-  if (changed) commit();
+  commit();
 }
 
 window.addEventListener('resize', positionAll);
@@ -986,6 +1076,10 @@ $('helpBtn').onclick = () => $('help').classList.add('open');
 $('helpClose').onclick = () => $('help').classList.remove('open');
 $('helpDc').onclick = () => { $('help').classList.remove('open'); $('dcOpen').click(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('help').classList.remove('open'); });
+// klik di luar panel bantuan menutupnya (tombol ? sendiri tidak dihitung, supaya klik-nya tetap membuka)
+document.addEventListener('pointerdown', e => {
+  if ($('help').classList.contains('open') && !e.target.closest('#help, #helpBtn')) $('help').classList.remove('open');
+});
 video.addEventListener('loadedmetadata', reclamp);
 // Saat jendela Discord di-drag ukurannya, resize datang beruntun: tunggu ukurannya stabil
 // supaya ukuran sementara yang kecil tidak memotong crop secara permanen.
@@ -1057,7 +1151,7 @@ function detectTick() {
 let discord = null; // null = server tidak punya discord.json
 const dSpeaking = new Map(); // userId -> sedang bicara
 const viaDiscord = s => discord?.status === 'ready' && !!s.discordId;
-const discordSpeaks = s => s.enabled && s.detect && layout.settings.detectEnabled && !!dSpeaking.get(s.discordId);
+const discordSpeaks = s => s.enabled && (s.detect || !!s.image) && layout.settings.detectEnabled && !!dSpeaking.get(s.discordId); // virtual frame: cukup sumber Discord
 function onDiscordSpeak(userId, on) {
   dSpeaking.set(userId, on);
   for (const s of layout.slots) if (s.discordId === userId && viaDiscord(s)) { speakInfo = { via: 'discord' }; setSpeaking(s.id, discordSpeaks(s)); }
@@ -1137,6 +1231,23 @@ function showUploads(u) {
   if (u.removed) setStatus(u.removed + ' gambar dihapus');
 }
 $('oClean').onclick = () => armed($('oClean'), 'Hapus gambar yang tidak dipakai', 'Klik lagi untuk menghapus', () => ws.send({ type: 'uploads_clean' }));
+// daftar virtual frame tersimpan: kosongkan, lalu gambar yang tidak dipakai lagi ikut dibersihkan (yang dipakai kanvas atau preset tetap)
+function renderLibInfo() {
+  const n = layout.library.filter(e => !layout.slots.some(s => s.id === e.id && s.enabled)).length;
+  $('oLib').textContent = n ? n + ' virtual frame tersimpan di daftar (tidak di kanvas).' : 'Tidak ada virtual frame tersimpan di luar kanvas.';
+  $('oLibClear').hidden = !layout.library.length;
+}
+$('oLibClear').onclick = () => armed($('oLibClear'), 'Hapus virtual frame tersimpan', 'Klik lagi untuk menghapus semua', () => {
+  layout.library = [];
+  commit(); renderLibInfo();
+  ws.send({ type: 'uploads_clean' });
+});
+// ---- export / import preset (preset-io-dialog.js) ----
+createPresetIoDialogs({
+  presets: () => layout.presets, log, copyText, fmtBytes,
+  onImport(added) { layout.presets.push(...added); commit(); renderPresets(); setStatus(added.length + ' preset diimpor'); },
+});
+
 // angka yang benar-benar dikirim ke OBS, tiap 2 detik selama tab Atur terbuka
 let lastOut = null;
 setInterval(async () => {
@@ -1271,6 +1382,36 @@ if (window.wakuApp?.bugReport) {
     $('bugInfo').textContent = text ? 'Tersalin. Tempel ke chat atau issue.' : 'Gagal membuat laporan.';
   };
   $('bugLogs').onclick = () => window.wakuApp.openLogs();
+}
+
+// ---- update aplikasi (hanya di aplikasi Electron; unduh/pasang di versi installer) ----
+if (window.wakuApp?.update) {
+  $('updBox').hidden = false;
+  const show = s => {
+    const v = s.version ?? '';
+    const info = {
+      dev: 'Update hanya tersedia di versi installer.', idle: 'Belum dicek.', checking: 'Mengecek update...', none: 'Waku sudah versi terbaru.',
+      available: 'Versi ' + v + ' tersedia.', downloading: 'Mengunduh versi ' + v + '... ' + (s.percent ?? 0) + '%',
+      ready: 'Versi ' + v + ' siap dipasang. Waku akan ditutup sebentar lalu terbuka lagi; capture perlu diulang.',
+      error: 'Gagal: ' + (s.msg ?? ''),
+    };
+    $('updInfo').textContent = info[s.status] ?? '';
+    const b = $('updBtn');
+    b.hidden = s.status === 'dev';
+    b.disabled = s.status === 'checking' || s.status === 'downloading';
+    b.classList.remove('armed');
+    b.textContent = s.status === 'available' ? 'Unduh versi ' + v : s.status === 'ready' ? 'Restart & pasang' : 'Cek update';
+    // restart menghentikan capture: klik dua kali, dan hanya dari tombol ini (bukan dari pill)
+    b.onclick = s.status === 'available' ? () => window.wakuApp.update('download')
+      : s.status === 'ready' ? () => armed(b, 'Restart & pasang', 'Klik lagi untuk restart', () => window.wakuApp.update('install'))
+      : () => window.wakuApp.update('check');
+    $('updChip').hidden = !['available', 'downloading', 'ready'].includes(s.status);
+    $('updState').textContent = s.status === 'downloading' ? (s.percent ?? 0) + '%' : s.status === 'ready' ? 'siap' : 'v' + v;
+    $('updState').className = s.status === 'ready' ? 'on' : 'wait';
+  };
+  $('updChip').onclick = () => { showTab('panelAtur'); $('updBox').scrollIntoView({ block: 'nearest' }); };
+  window.wakuApp.onUpdate(show);
+  show(await window.wakuApp.update('state'));
 }
 
 // ---- shortcut global / Stream Deck (hanya di aplikasi Electron) ----

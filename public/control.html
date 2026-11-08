@@ -10,10 +10,9 @@
 </head>
 <body>
 <header class="top">
-  <span class="crumb" title="Waku — Discord Co-op Camera Isolator by Kurohiko">Waku / <b>Layout</b></span>
+  <span class="crumb" title="Waku : Discord Co-op Webcam Isolator Overlay by Kurohiko">Waku / <b>Layout</b></span>
   <span class="spacer"></span>
-  <span id="status"></span>
-  <span id="notice" role="alert"></span>
+  <div id="toasts"><span id="status" role="status" aria-live="polite"></span><span id="notice" role="alert"></span></div>
   <div class="url">
       <span id="previewUrl">http://localhost:1500/preview</span>
       <button id="copyUrl" type="button" aria-label="Salin link preview" title="Salin link preview">
@@ -24,6 +23,7 @@
   <span class="pill" title="Koneksi halaman ini ke server lokal. Kalau terputus, perubahan tidak sampai ke OBS dan tidak tersimpan."><i class="dot"></i>Server <b id="wsState" class="off">...</b></span>
   <span class="pill" id="capChip" title="Capture jendela Discord. Kalau mati, OBS tidak menerima video."><i class="dot"></i>Capture <b id="capState" class="off">mati</b></span>
   <button type="button" class="pill" id="dcChip" hidden title="Status bicara langsung dari aplikasi Discord di PC ini."><i class="dot"></i>Discord <b id="dcState" class="off">...</b></button>
+  <button type="button" class="pill" id="updChip" hidden title="Ada versi baru Waku. Klik untuk melihat."><i class="dot"></i>Update <b id="updState" class="wait"></b></button>
   <button type="button" class="pill" id="detChip" title="Deteksi bicara untuk semua frame. Klik untuk menyalakan atau mematikan."><i class="dot"></i>Deteksi <b id="detState" class="off">mati</b></button>
   <button id="pause" class="btn icon" type="button" aria-pressed="false" aria-label="Jeda pratinjau" title="Jeda pratinjau: hemat resource, berhenti menggambar ulang tile di kanvas. Stream ke OBS dan deteksi bicara tetap jalan. Menggambar ulang juga berhenti sendiri saat tab ini tersembunyi."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg></button>
   <button id="helpBtn" class="btn icon" type="button" aria-label="Persiapan sebelum live" title="Persiapan sebelum live"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/></svg></button>
@@ -132,6 +132,11 @@
           <button id="deckInstall" class="btn small" type="button">Pasang plugin Stream Deck</button>
           <p class="hint" id="deckInfo" role="status"></p>
         </div>
+        <div class="box" id="updBox" hidden>
+          <h3>Update</h3>
+          <p class="hint" id="updInfo" role="status"></p>
+          <button id="updBtn" class="btn small" type="button">Cek update</button>
+        </div>
         <div class="box" id="bugBox" hidden>
           <h3>Laporan bug</h3>
           <p class="hint">Salin info, lalu kirim ke developer.</p>
@@ -141,17 +146,23 @@
           <p class="hint">Log tidak berisi token / secret Discord.</p>
         </div>
         <div class="box">
+          <h3>Export / import preset</h3>
+          <p class="hint">Bagikan preset ke teman, atau pakai preset dari orang lain. Disimpan sebagai file .json.</p>
+          <button id="exOpen" class="btn small" type="button">Export preset</button>
+          <button id="imOpen" class="btn small" type="button">Import preset</button>
+        </div>
+        <div class="box">
           <h3>Gambar unggahan</h3>
           <p class="hint" id="oUploads">Menghitung...</p>
           <button id="oClean" class="btn small" type="button" disabled>Hapus gambar yang tidak dipakai</button>
-        </div>
-        <div class="box">
-          <h3>Dukung developer</h3>
-          <p class="hint">Waku gratis. Kalau membantu stream kamu, dukung pengembangannya:</p>
-          <a class="btn small primary support" href="https://saweria.co/Kurohiko" target="_blank" rel="noopener">Donasi di Saweria</a>
-          <a class="btn small primary support" href="https://kurohikotopup.com" target="_blank" rel="noopener">Top up game di KurohikoTopUp</a>
+          <p class="hint" id="oLib"></p>
+          <button id="oLibClear" class="btn small" type="button" hidden>Hapus virtual frame tersimpan</button>
         </div>
         <p class="hint about">Waku <b id="oVersion">...</b></p>
+        <nav class="atur-foot" aria-label="Dukung developer">
+          <a href="https://saweria.co/Kurohiko" target="_blank" rel="noopener">Donate</a>
+          <a href="https://kurohikotopup.com" target="_blank" rel="noopener">KurohikoTopUp.com</a>
+        </nav>
       </div>
     </div>
   </aside>
@@ -286,6 +297,10 @@
 </dialog>
 <dialog id="vDialog" aria-labelledby="vTitle">
   <div class="dlg-head"><h2 id="vTitle">Tambah virtual frame</h2></div>
+  <div class="v-lib" id="vLib">
+    <p class="hint">Pilih virtual frame yang pernah dipakai, atau buat yang baru. Nama, gambar, dan sumber bicaranya ikut kembali.</p>
+    <div class="v-lib-grid" id="vLibGrid"></div>
+  </div>
   <div class="v-body">
     <div class="v-main">
       <div id="vView" class="v-view">
@@ -349,6 +364,29 @@
     <a class="btn small primary support" href="https://kurohikotopup.com" target="_blank" rel="noopener">Top up game murah di KurohikoTopUp.com</a>
   </div>
   <div class="dlg-foot"><span class="grow"></span><button id="supportClose" class="btn" type="button">Tutup</button></div>
+</dialog>
+<dialog id="exDlg" aria-labelledby="exTitle">
+  <div class="dlg-head"><h2 id="exTitle">Export preset</h2></div>
+  <div class="dc-body">
+    <p class="hint">Pilih preset yang mau diekspor. Nama bisa diganti dulu; preset kamu sendiri tidak berubah. Simpan sebagai file, atau salin teksnya untuk ditempel di chat. Gambar virtual frame ikut di dalamnya.</p>
+    <div id="exList" class="io-list"></div>
+    <label><input type="checkbox" id="exAccounts">Sertakan akun Discord (untuk backup sendiri)</label>
+    <p class="hint" id="exInfo" role="status"></p>
+  </div>
+  <div class="dlg-foot"><span class="grow"></span><button id="exClose" class="btn" type="button">Tutup</button><button id="exCopy" class="btn" type="button">Salin teks</button><button id="exSave" class="btn primary" type="button">Simpan file</button></div>
+</dialog>
+<dialog id="imDlg" aria-labelledby="imTitle">
+  <div class="dlg-head"><h2 id="imTitle">Import preset</h2></div>
+  <div class="dc-body">
+    <p class="hint">Pilih file preset Waku (.json), atau tempel teks JSON-nya. Preset dengan nama yang sudah ada diberi akhiran v2, v3, dan seterusnya.</p>
+    <button id="imPick" class="btn small" type="button">Pilih file...</button>
+    <input type="file" id="imFile" accept=".json,application/json" hidden>
+    <textarea id="imText" rows="4" spellcheck="false" placeholder="atau tempel teks JSON di sini" aria-label="Teks JSON preset"></textarea>
+    <button id="imRead" class="btn small" type="button">Baca teks</button>
+    <div id="imList" class="io-list"></div>
+    <p class="hint" id="imInfo" role="status"></p>
+  </div>
+  <div class="dlg-foot"><span class="grow"></span><button id="imClose" class="btn" type="button">Tutup</button><button id="imSave" class="btn primary" type="button" disabled>Import</button></div>
 </dialog>
 <dialog id="busyDlg" aria-labelledby="busyTitle">
   <h2 id="busyTitle">Waku sedang dibuka di tab lain</h2>

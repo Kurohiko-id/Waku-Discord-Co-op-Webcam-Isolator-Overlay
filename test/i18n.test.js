@@ -13,7 +13,7 @@ const read = f => fs.readFileSync(new URL('../public/' + f, import.meta.url), 'u
 // Menu Discord / Developer Portal ditulis persis seperti di aplikasinya (bahasa Inggris).
 const KEEP = new Set([
   'OBS', 'Discord', 'Stream Deck', 'ID', 'EN', 'Client ID', 'Client Secret', 'Saweria', 'px', 'fps', 'Mbps', 'URL',
-  'Waku', 'WAKU', 'Waku /', 'Waku — Discord Co-op Camera Isolator by Kurohiko', 'Support Dev', 'Support Developer',
+  'Waku', 'WAKU', 'Waku /', 'Waku : Discord Co-op Webcam Isolator Overlay by Kurohiko', 'Support Dev', 'Support Developer',
   'Capture', 'Frame', 'Preset', 'Template', 'Bitrate', 'FPS', 'Port', 'Window', 'Background', 'Zoom', 'Hotkey',
   'Virtual frame', 'Edit frame...', 'Edit virtual frame',
   'Show Non-Video Participants', 'Show My Own Camera', 'Discord Developer Portal', 'New Application', 'OAuth2',
@@ -48,7 +48,7 @@ function jsTexts(src) {
 test('semua teks UI halaman kontrol punya terjemahan EN', () => {
   const texts = [
     ...htmlTexts(read('control.html')),
-    ...['control.js', 'crop-dialog.js', 'virtual-dialog.js', 'style-form.js'].flatMap(f => jsTexts(read(f))),
+    ...['control.js', 'crop-dialog.js', 'virtual-dialog.js', 'style-form.js', 'preset-io-dialog.js'].flatMap(f => jsTexts(read(f))),
   ];
   const missing = [...new Set(texts.filter(needsText).filter(s => !translates(s)))];
   assert.deepEqual(missing, [], 'Tambahkan entri di EN atau PATTERNS (public/shared/i18n.js):\n' + missing.join('\n'));

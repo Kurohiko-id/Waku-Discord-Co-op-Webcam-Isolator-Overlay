@@ -64,7 +64,7 @@ const EN = {
   'Lepas sematan: pindah ke menu Lainnya': 'Unpin: move to the More menu', 'Sematkan: tampil sebagai tombol di bawah kanvas': 'Pin: show as a button below the canvas',
   'Lainnya ▾': 'More ▾', 'Pilih preset ▾': 'Choose preset ▾', 'Preset lainnya': 'More presets',
   'Sematkan preset supaya tampil sebagai tombol di bawah kanvas. Tarik untuk mengubah urutan.': 'Pin a preset to show it as a button below the canvas. Drag to reorder.',
-  'Tarik untuk mengubah urutan': 'Drag to reorder', 'nama & akun ikut': 'names & accounts included', 'susunan saja': 'arrangement only',
+  'Tarik untuk mengubah urutan': 'Drag to reorder', 'dengan akun': 'with accounts', 'Nama frame dan akun Discord ikut tersimpan': 'Frame names and Discord accounts are saved too', 'Hanya susunan; saat dipakai, frame jadi DC 1, DC 2, ...': 'Arrangement only; when applied, frames become DC 1, DC 2, ...', 'susunan saja': 'arrangement only',
   'Klik lagi untuk menimpa': 'Click again to overwrite',
   'Simpan juga nama frame & akun Discord': 'Also save frame names & Discord accounts',
   'Nyalakan untuk teman mabar tetap: nama frame dan akun Discord (deteksi Official) ikut tersimpan. Matikan untuk susunan umum: saat dipakai, frame mulai kosong (DC 1, DC 2, ...) dengan deteksi nonaktif.': 'Turn on for your regular squad: frame names and Discord accounts (Official detection) are saved too. Turn off for a general arrangement: when applied, frames start empty (DC 1, DC 2, ...) with detection off.',
@@ -85,8 +85,7 @@ const EN = {
   'Gambar unggahan': 'Uploaded images', 'Menghitung...': 'Counting...', 'Hapus gambar yang tidak dipakai': 'Delete unused images',
   'Belum ada gambar unggahan.': 'No uploaded images yet.',
   'Klik lagi untuk menghapus': 'Click again to delete',
-  'Dukung developer': 'Support the developer', 'Waku gratis. Kalau membantu stream kamu, dukung pengembangannya:': 'Waku is free. If it helps your stream, support its development:',
-  'Donasi di Saweria': 'Donate on Saweria', 'Top up game di KurohikoTopUp': 'Game top-ups at KurohikoTopUp',
+  'Dukung developer': 'Support the developer', 'Donate': 'Donate',
 
   // kanvas
   'Kanvas OBS': 'OBS canvas', 'Tambah frame': 'Add frame', 'Jadikan ukuran utama': 'Make main size',
@@ -110,7 +109,7 @@ const EN = {
 
   // capture
   'menyiapkan...': 'preparing...', 'Pilih jendela Discord...': 'Choose the Discord window...', 'Menyiapkan capture...': 'Preparing capture...',
-  'Capture dibatalkan': 'Capture canceled', 'Capture berhenti, klik Capture lagi': 'Capture stopped, click Capture again', 'Capture aktif': 'Capture active',
+  'Capture dibatalkan': 'Capture canceled', 'Ukuran jendela Discord berubah. Kembalikan ukurannya, atau atur ulang crop.': 'The Discord window size changed. Restore its size, or set the crops again.', 'Capture berhenti, klik Capture lagi': 'Capture stopped, click Capture again', 'Capture aktif': 'Capture active',
 
   // bantuan
   'Persiapan sebelum live': 'Before going live', 'Di Discord': 'In Discord', 'Matikan': 'Turn off',
@@ -156,6 +155,11 @@ const EN = {
   'Wilayah deteksi bicara: taruh di tempat outline hijau Discord muncul': 'Speaking detection area: place it where Discord’s green outline appears',
 
   // virtual frame
+  'Pilih virtual frame yang pernah dipakai, atau buat yang baru. Nama, gambar, dan sumber bicaranya ikut kembali.': 'Pick a virtual frame you used before, or create a new one. Its name, image, and speaking source come back too.',
+  'Buat virtual frame baru': 'Create a new virtual frame', 'Tanpa sumber bicara': 'No speaking source', 'Sudah di kanvas': 'Already on canvas',
+  'Tersembunyi di kanvas': 'Hidden on canvas', 'Gambar hilang': 'Image missing', 'Hapus permanen': 'Delete permanently', 'Klik lagi untuk hapus permanen': 'Click again to delete permanently',
+  'Virtual frame ditampilkan lagi': 'Virtual frame shown again', 'Hapus virtual frame tersimpan': 'Delete saved virtual frames',
+  'Klik lagi untuk menghapus semua': 'Click again to delete all', 'Tidak ada virtual frame tersimpan di luar kanvas.': 'No saved virtual frames outside the canvas.',
   'Tambah virtual frame': 'Add virtual frame', 'Pilih gambar': 'Choose image',
   'atau seret file ke sini': 'or drop a file here', 'PNG, JPG, GIF bergerak, WebP · maks 8 MB': 'PNG, JPG, animated GIF, WebP · max 8 MB',
   'Ganti gambar': 'Change image', 'Seret gambar untuk menggeser, scroll untuk zoom': 'Drag the image to pan, scroll to zoom',
@@ -207,6 +211,26 @@ const EN = {
   'Gagal membuka plugin. Pastikan aplikasi Stream Deck terpasang.': 'Couldn’t open the plugin. Make sure the Stream Deck app is installed.',
   'Tutup popup Crop dulu sebelum ganti preset': 'Close the Crop popup before switching presets',
 
+  // update aplikasi (aplikasi Electron)
+  'Update': 'Update', 'Cek update': 'Check for updates', 'Belum dicek.': 'Not checked yet.', 'Mengecek update...': 'Checking for updates...',
+  'Waku sudah versi terbaru.': 'Waku is up to date.', 'Update hanya tersedia di versi installer.': 'Updates are only available in the installed version.',
+  'Restart & pasang': 'Restart & install', 'Klik lagi untuk restart': 'Click again to restart', 'siap': 'ready',
+  'Ada versi baru Waku. Klik untuk melihat.': 'A new version of Waku is available. Click to view.',
+  'Belum ada rilis yang bisa diunduh.': 'No release available to download yet.', 'Tidak bisa terhubung ke GitHub. Cek koneksi internet.': 'Can’t reach GitHub. Check your internet connection.',
+
+  // export / import preset
+  'Export / import preset': 'Export / import presets', 'Export preset': 'Export presets', 'Import preset': 'Import presets', 'Export': 'Export', 'Import': 'Import',
+  'Bagikan preset ke teman, atau pakai preset dari orang lain. Disimpan sebagai file .json.': 'Share presets with friends, or use presets from others. Saved as a .json file.',
+  'Pilih preset yang mau diekspor. Nama bisa diganti dulu; preset kamu sendiri tidak berubah. Simpan sebagai file, atau salin teksnya untuk ditempel di chat. Gambar virtual frame ikut di dalamnya.': 'Choose the presets to export. You can rename them first; your own presets stay unchanged. Save as a file, or copy the text to paste in a chat. Virtual frame images are included.',
+  'Sertakan akun Discord (untuk backup sendiri)': 'Include Discord accounts (for your own backup)',
+  'Pilih file preset Waku (.json), atau tempel teks JSON-nya. Preset dengan nama yang sudah ada diberi akhiran v2, v3, dan seterusnya.': 'Choose a Waku preset file (.json), or paste its JSON text. Presets whose name already exists get a v2, v3, and so on suffix.',
+  'Salin teks': 'Copy text', 'Simpan file': 'Save file', 'atau tempel teks JSON di sini': 'or paste JSON text here', 'Teks JSON preset': 'Preset JSON text',
+  'Baca teks': 'Read text', 'Tempel teks JSON dulu.': 'Paste JSON text first.', 'Gagal menyalin, coba Simpan file.': 'Copy failed, try Save file.',
+  'Pilih file...': 'Choose file...', 'Pilih preset': 'Select preset', 'Pilih minimal satu preset.': 'Select at least one preset.',
+  'Belum ada preset untuk diekspor.': 'No presets to export yet.', 'Sudah 20 preset. Hapus beberapa dulu.': 'You already have 20 presets. Delete some first.',
+  'Isinya bukan JSON yang valid.': 'This isn’t valid JSON.', 'Isinya bukan preset Waku.': 'This isn’t a Waku preset.',
+  'Tidak ada preset yang bisa dibaca.': 'No readable presets found.',
+
   // laporan bug (aplikasi Electron)
   'Laporan bug': 'Bug report', 'Salin info': 'Copy info', 'Buka folder log': 'Open log folder',
   'Salin info, lalu kirim ke developer.': 'Copy the info, then send it to the developer.',
@@ -220,7 +244,11 @@ const plural = (n, w) => n + ' ' + w + (Number(n) === 1 ? '' : 's');
 const PATTERNS = [
   [/^(\d+) frame$/, (_, n) => plural(n, 'frame')],
   [/^Terapkan preset \((\d+) frame\)$/, (_, n) => `Apply preset (${plural(n, 'frame')})`],
+  [/^Preset "(.*)" diterapkan · (\d+) virtual frame gambarnya hilang$/s, (_, p, n) => `Preset "${p}" applied · ${n} virtual frame${n === '1' ? '' : 's'} missing an image`],
   [/^Preset "(.*)" diterapkan$/s, 'Preset "$1" applied'],
+  [/^Bicara: (.*)$/s, 'Speaking: $1'],
+  [/^Dipakai di (\d+) preset · klik lagi untuk hapus permanen$/, (_, n) => `Used in ${n} preset${n === '1' ? '' : 's'} · click again to delete permanently`],
+  [/^(\d+) virtual frame tersimpan di daftar \(tidak di kanvas\)\.$/, (_, n) => `${n} saved virtual frame${n === '1' ? '' : 's'} (not on canvas).`],
   [/^Capture gagal: (.*)$/s, 'Capture failed: $1'],
   [/^Hapus frame (.+) \(klik dua kali untuk memastikan\)$/s, 'Delete frame $1 (click twice to confirm)'],
   [/^Reset (.+): crop kembali ke yang diatur di popup, ukuran tile ke bawaan$/s, 'Reset $1: crop back to the popup setting, tile size to default'],
@@ -244,6 +272,17 @@ const PATTERNS = [
   [/^Template: (.*)$/s, 'Template: $1'],
   [/^Preset: (.*)$/s, 'Preset: $1'],
   [/^Port (\d+) sedang dipakai program lain\.$/, 'Port $1 is in use by another program.'],
+  [/^Versi (.+) tersedia\.$/, 'Version $1 is available.'],
+  [/^Unduh versi (.+)$/, 'Download version $1'],
+  [/^Mengunduh versi (.+)\.\.\. (\d+)%$/, 'Downloading version $1... $2%'],
+  [/^Versi (.+) siap dipasang\. Waku akan ditutup sebentar lalu terbuka lagi; capture perlu diulang\.$/, 'Version $1 is ready to install. Waku will close briefly and reopen; you’ll need to capture again.'],
+  [/^Gagal: (.*)$/s, (_, m) => 'Failed: ' + tr(m)],
+  [/^Nama sudah ada, jadi "(.*)"$/s, 'Name already exists, renamed to "$1"'],
+  [/^(\d+) preset terbaca\.$/, (_, n) => `${n} preset${n === '1' ? '' : 's'} found.`],
+  [/^Hanya bisa menambah (\d+) preset lagi \(maksimal 20\)\.$/, 'You can add only $1 more presets (max 20).'],
+  [/^File dibuat: (.*)$/s, 'File created: $1'],
+  [/^Teks JSON disalin \((.+)\)\. Tempel di chat untuk dibagikan\.$/s, 'JSON text copied ($1). Paste it in a chat to share.'],
+  [/^(\d+) preset diimpor$/, (_, n) => `${n} preset${n === '1' ? '' : 's'} imported`],
 ];
 
 const KEY = 'waku.lang';
