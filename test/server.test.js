@@ -87,6 +87,14 @@ test('speaking, signal, dan ready dirutekan', async () => {
   c.close(); p.close(); await srv.close();
 });
 
+test('offer tanpa preview dibalas no_preview ke control', async () => {
+  const { srv, port } = await setup();
+  const c = await open(port, 'control');
+  c.send(JSON.stringify({ type: 'signal', data: { sdp: 'offer' } }));
+  await next(c, m => m.type === 'no_preview');
+  c.close(); await srv.close();
+});
+
 const within = (p, ms = 1500) =>
   Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 
@@ -115,7 +123,7 @@ test('pesan terlalu besar memutus koneksi pengirim saja', async () => {
   const { srv, port } = await setup();
   const c = await open(port, 'control');
   c.on('error', () => {});
-  c.send('x'.repeat(300_000));
+  c.send('x'.repeat(1_100_000));
   assert.equal(await within(new Promise(r => c.on('close', r))), 1009);
   const p = await open(port, 'preview');
   await next(p, isLayout);

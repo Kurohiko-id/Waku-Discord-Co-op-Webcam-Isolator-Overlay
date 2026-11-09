@@ -1,14 +1,14 @@
 {
   "name": "waku",
   "productName": "Waku",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Discord Co-op Webcam Isolator Overlay for OBS",
   "author": {
     "name": "Kurohiko",
     "url": "https://kurohiko.id"
   },
   "license": "MIT",
-  "homepage":"https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator-Overlay",
+  "homepage": "https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator-Overlay",
   "repository": {
     "type": "git",
     "url": "https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator-Overlay.git"

@@ -45,6 +45,7 @@ test('layout kosong valid dengan settings default', () => {
     template: 'sticker-night',
     guides: { x: [], y: [] },
     presets: [],
+    temp: [],
     library: [],
   });
 });
@@ -63,8 +64,10 @@ test('presets divalidasi: id, nama, isi slot, dan batas jumlah', () => {
   assert.deepEqual(l.presets.map(p => [p.id, p.slots.length]), [['p1', 2], ['p2', 1]]);
   assert.equal(l.presets[1].name.length, 40);
   for (const bad of [null, undefined, 5, 'x', {}]) assert.deepEqual(validateLayout({ slots: [], presets: bad }).presets, []);
-  const many = Array.from({ length: 30 }, (_, i) => ({ id: 'p' + i, name: 'n' + i, slots: [a[0]] }));
-  assert.equal(validateLayout({ slots: [], presets: many }).presets.length, 20);
+  const many = Array.from({ length: 60 }, (_, i) => ({ id: 'p' + i, name: 'n' + i, slots: [a[0]] }));
+  assert.equal(validateLayout({ slots: [], presets: many }).presets.length, 50);
+  const temp = validateLayout({ slots: [], temp: many.map((p, i) => ({ ...p, t: 1000 + i })) }).temp;
+  assert.deepEqual([temp.length, temp[0].t], [15, 1000]); // Temp: 15 terakhir, waktu ikut tersimpan
 });
 
 test('guides divalidasi: hanya angka dalam kanvas, dibulatkan, unik, terurut, maksimal 20 per sumbu', () => {

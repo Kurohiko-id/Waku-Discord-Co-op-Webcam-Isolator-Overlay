@@ -40,7 +40,7 @@ function readLayout(file, onBad) {
 }
 
 // Preview tidak memakai preset dan garis bantu; jangan kirim ulang semuanya tiap drag.
-const forPreview = ({ presets: _p, guides: _g, library: _l, ...rest }) => rest;
+const forPreview = ({ presets: _p, temp: _t, guides: _g, library: _l, ...rest }) => rest;
 
 export function createServer({
   port = 1500,
@@ -195,7 +195,7 @@ export function createServer({
   const wss = new WebSocketServer({
     server: httpServer,
     path: '/ws',
-    maxPayload: 256 * 1024, // 16 slot + 20 preset bisa ~90 KB
+    maxPayload: 1024 * 1024, // 16 slot + 50 preset bisa ~230 KB
     verifyClient: info => originOk(info.origin) && hostOk(info.req.headers.host),
   });
   // ws meneruskan error httpServer (mis. EADDRINUSE) ke wss; tanpa listener ini error dilempar sebagai uncaught
@@ -417,7 +417,9 @@ export function createServer({
       } else if (msg.type === 'discord_creds' && role === 'control') {
         setCreds(msg);
       } else if (msg.type === 'signal') {
-        sendWs(latest(peer), { type: 'signal', data: msg.data });
+        const to = latest(peer);
+        if (to) sendWs(to, { type: 'signal', data: msg.data });
+        else if (role === 'control') sendWs(ws, { type: 'no_preview' }); // control berhenti mengulang offer sampai preview kirim 'ready'
       } else if (msg.type === 'ready' && role === 'preview' && ws === latest('preview')) {
         sendWs(latest('control'), { type: 'ready' });
       } else if (msg.type === 'visible' && role === 'preview' && ws === latest('preview')) {

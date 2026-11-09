@@ -56,7 +56,9 @@ function validateSlots(list) {
 }
 
 // Preset = susunan lengkap slot (crop, deteksi, posisi tile, gaya) yang bisa dipanggil lagi, mis. "Duo atas-bawah".
-function validatePresets(list) {
+export const MAX_PRESETS = 50; // semua preset ikut di tiap pesan layout (juga saat drag); naikkan maxPayload server bila diubah
+export const MAX_TEMP = 15; // Temp: susunan yang tertimpa saat preset/template diterapkan, 15 terakhir
+function validatePresets(list, max = MAX_PRESETS) {
   const out = [];
   for (const p of Array.isArray(list) ? list : []) {
     const slots = validateSlots(p?.slots);
@@ -66,8 +68,9 @@ function validatePresets(list) {
       pinned: !!p.pinned, // disematkan: tampil sebagai tombol di bawah kanvas (sisanya di menu Lainnya)
       full: p.full !== false, // nama frame & akun Discord ikut tersimpan; preset lama selalu begitu
       frameW: frameSize(p.frameW), frameH: frameSize(p.frameH), // ukuran capture saat preset disimpan
+      ...(num(p.t) ? { t: p.t } : {}), // Temp: kapan susunan ini tertimpa
     });
-    if (out.length >= 20) break;
+    if (out.length >= max) break;
   }
   return out;
 }
@@ -194,6 +197,7 @@ export function validateLayout(l) {
     template: TEMPLATES[l.template] ? l.template : l.style ? '' : DEFAULT_TEMPLATE,
     guides: validateGuides(l.guides),
     presets: validatePresets(l.presets),
+    temp: validatePresets(l.temp, MAX_TEMP),
     library: validateLibrary(l.library),
   };
 }

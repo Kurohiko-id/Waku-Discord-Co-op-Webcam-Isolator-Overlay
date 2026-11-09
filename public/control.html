@@ -85,9 +85,8 @@
         </div>
         <div class="box" id="presetBox">
           <h3>Preset layout</h3>
-          <label class="sf-row"><span>Nama preset</span><input id="pName" maxlength="40" placeholder="mis. Duo atas-bawah"></label>
-          <label title="Nyalakan untuk teman mabar tetap: nama frame dan akun Discord (deteksi Official) ikut tersimpan. Matikan untuk susunan umum: saat dipakai, frame mulai kosong (DC 1, DC 2, ...) dengan deteksi nonaktif."><input type="checkbox" id="pFull">Simpan juga nama frame &amp; akun Discord</label>
-          <button id="pSave" class="btn small" type="button">Simpan susunan sekarang</button>
+          <span class="seg" id="pTabs" role="group" aria-label="Daftar preset"><button type="button" data-tab="saved" aria-pressed="true">Simpan</button><button type="button" data-tab="temp" aria-pressed="false" title="Susunan yang tertimpa saat preset atau template diterapkan (15 terakhir)">Temp</button></span>
+          <div class="p-tools"><input id="pSearch" type="search" placeholder="Cari preset..." aria-label="Cari preset" autocomplete="off" spellcheck="false"><button id="pSave" class="btn small" type="button" title="Simpan susunan sekarang">+ Simpan</button></div>
           <div id="pList"></div>
           <button id="pUndo" class="btn small" type="button" disabled>Urungkan terapkan preset</button>
         </div>
@@ -209,6 +208,13 @@
   </div>
 </div>
 
+<form id="pSaveDlg" popover>
+  <h3 id="pSaveTitle">Simpan preset</h3>
+  <label class="sf-row"><span>Nama preset</span><input id="pName" maxlength="40" placeholder="mis. Duo atas-bawah" required autocomplete="off"></label>
+  <label id="pFullRow" title="Nyalakan untuk teman mabar tetap: nama frame dan akun Discord (deteksi Official) ikut tersimpan. Matikan untuk susunan umum: saat dipakai, frame mulai kosong (DC 1, DC 2, ...) dengan deteksi nonaktif."><input type="checkbox" id="pFull">Simpan juga nama frame &amp; akun Discord</label>
+  <div class="p-dlg-acts"><button type="button" class="btn small" popovertarget="pSaveDlg" popovertargetaction="hide">Batal</button><button id="pSaveOk" type="submit" class="btn small primary">Simpan</button></div>
+</form>
+<div id="pMenu" popover></div>
 <div id="morePresets" popover>
   <h3>Preset lainnya</h3>
   <div id="moreList"></div>

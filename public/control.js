@@ -1,5 +1,5 @@
 import { connect } from '/shared/ws.js';
-import { newSlot, newSlotFrom, nextSlotName, presetOrder, mergeDraft, presetSlots, applyPresetSlots, virtualLibrary, rememberVirtual, forgetVirtual, withVirtualSources, rescaleSlots } from '/shared/layout.js';
+import { newSlot, newSlotFrom, nextSlotName, presetOrder, mergeDraft, presetSlots, applyPresetSlots, virtualLibrary, rememberVirtual, forgetVirtual, withVirtualSources, rescaleSlots, MAX_PRESETS, MAX_TEMP } from '/shared/layout.js';
 import { snapRect, snapSpacing, alignedLines, ratioHeight, clampRect, resizeCorner, cropFromTile } from '/shared/geometry.js';
 import { attachDrag } from '/shared/drag.js';
 import { place, showGuides, showMatch, showGaps, addCorners } from '/editor-dom.js';
@@ -81,8 +81,9 @@ $('copyUrl').onclick = async () => {
 };
 
 function onMsg(msg) {
-  if (msg.type === 'layout') { layout = msg.layout; layout.guides ??= { x: [], y: [] }; layout.presets ??= []; layout.library ??= []; savedJson = JSON.stringify(layout); render(); } // titik awal riwayat
-  else if (msg.type === 'ready') { previewVisible = true; offer(); } // preview (baru) melapor sendiri bila tersembunyi
+  if (msg.type === 'layout') { layout = msg.layout; layout.guides ??= { x: [], y: [] }; layout.presets ??= []; layout.temp ??= []; layout.library ??= []; savedJson = JSON.stringify(layout); render(); } // titik awal riwayat
+  else if (msg.type === 'ready') { previewVisible = true; noPreview = false; offer(); } // preview (baru) melapor sendiri bila tersembunyi
+  else if (msg.type === 'no_preview') noPreview = true; // OBS belum/tidak terbuka: offer menunggu 'ready', tidak diulang tiap 10 detik
   else if (msg.type === 'visible') setPreviewVisible(msg.on);
   else if (msg.type === 'discord') onDiscord(msg);
   else if (msg.type === 'info') $('oVersion').textContent = 'v' + msg.version;
@@ -220,6 +221,7 @@ $('aUndo').onclick = undoBulk;
 // template otomatis: langsung berlaku (dari kondisi sebelum sesi), jadi bisa diganti-ganti dan diurungkan
 $('aKind').onchange = e => {
   if (!e.target.value) return;
+  if (!bulk.snapshot || bulk.preset) pushTemp('template ' + e.target.selectedOptions[0].text); // awal sesi template: susunan sebelumnya ke Temp
   bulk.width = false; bulk.grid = false;
   bulk.auto = { kind: e.target.value, gap: Number($('aGap').value) };
   runBulk();
@@ -249,51 +251,77 @@ $('mainSize').onclick = () => {
 // ---- preset layout: susunan lengkap slot (crop, deteksi, tile, gaya) yang bisa dipanggil lagi ----
 let appShortcuts = []; // shortcut global aplikasi Electron: [{ key: 'Control+Alt+P', action: { type: 'preset', id } }, ...]
 const keyLabel = k => k.replace('Control', 'Ctrl').replace('Super', 'Win').replace(/num(\d)/, 'Num $1');
+let pTab = 'saved'; // tab daftar preset: 'saved' (preset bernama) atau 'temp' (susunan yang tertimpa)
+const SVG_NS = 'http://www.w3.org/2000/svg';
+// Gambar mini susunan: posisi tile di kanvas 1920x1080, supaya preset dikenali dari bentuknya, bukan cuma nama.
+function presetThumb(slots) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'pthumb');
+  svg.setAttribute('viewBox', '0 0 ' + CANVAS.w + ' ' + CANVAS.h);
+  svg.setAttribute('aria-hidden', 'true');
+  for (const { place: r } of slots) {
+    const rect = document.createElementNS(SVG_NS, 'rect');
+    for (const [k, v] of [['x', r.x], ['y', r.y], ['width', Math.max(30, r.w)], ['height', Math.max(30, r.h)]]) rect.setAttribute(k, Math.round(v));
+    svg.append(rect);
+  }
+  return svg;
+}
+// Nama orang di preset (frame kamera yang sudah dinamai; DC 1, DC 2, ... dan virtual frame tidak dihitung).
+const presetPeople = p => (p.full ? p.slots.filter(s => !s.image && s.name && !/^DC \d+$/.test(s.name)).map(s => s.name) : []);
+const presetInfo = p => { const who = presetPeople(p); return p.slots.length + ' frame · ' + (who.length ? who.join(', ') : p.full ? 'dengan akun' : 'susunan saja'); };
+const tempTime = t => {
+  const d = new Date(t), hm = d.toTimeString().slice(0, 5);
+  return d.toDateString() === new Date().toDateString() ? hm : d.toLocaleDateString(getLang() === 'id' ? 'id-ID' : 'en-GB', { day: 'numeric', month: 'short' }) + ' ' + hm;
+};
+function presetRow(p, temp) {
+  const row = document.createElement('div');
+  row.className = 'preset';
+  row.tabIndex = 0;
+  row.title = temp ? 'Klik untuk kembali ke susunan ini' : 'Klik untuk menerapkan. Tarik untuk mengubah urutan';
+  if (!temp && !$('pSearch').value) sortablePreset(row, p);
+  const info = document.createElement('div');
+  info.className = 'pinfo';
+  const title = document.createElement('b');
+  title.className = 'pname';
+  const name = document.createElement('span');
+  name.textContent = temp ? 'Sebelum ' + (p.name || 'Tanpa nama') : p.name || 'Tanpa nama';
+  name.title = name.textContent; // nama panjang terpotong: lengkapnya saat disorot
+  if (!temp && p.pinned) title.insertAdjacentHTML('beforeend', PIN_SVG);
+  title.append(name);
+  const meta = document.createElement('small');
+  meta.className = 'pmeta';
+  if (temp) { const t = document.createElement('span'); t.className = 'ptime'; t.textContent = tempTime(p.t); meta.append(t); }
+  const what = document.createElement('span');
+  what.textContent = presetInfo(p);
+  what.title = what.textContent;
+  meta.append(what);
+  const key = !temp && appShortcuts.find(s => s.action.type === 'preset' && s.action.id === p.id)?.key;
+  if (key) { const k = document.createElement('kbd'); k.textContent = keyLabel(key); k.title = 'Shortcut'; meta.append(k); }
+  info.append(title, meta);
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.className = 'pmore';
+  more.textContent = '⋯';
+  more.title = 'Aksi lain';
+  more.setAttribute('aria-label', 'Aksi lain');
+  more.onclick = e => { e.stopPropagation(); presetMenu(more, p, temp); };
+  row.append(presetThumb(p.slots), info, more);
+  const go = () => applyPreset(p, temp);
+  row.onclick = go;
+  row.onkeydown = e => { if (e.key === 'Enter' && e.target === row) go(); };
+  return row;
+}
 function renderPresets() {
   reportDeck();
-  const rows = layout.presets.map(p => {
-    const row = document.createElement('div');
-    row.className = 'preset';
-    row.title = 'Tarik untuk mengubah urutan';
-    sortablePreset(row, p);
-    // baris 1: nama + Terapkan; baris 2: info satu baris (+ shortcut) + Timpa / Hapus
-    const title = document.createElement('b');
-    title.className = 'pname';
-    title.textContent = p.name || 'Tanpa nama';
-    title.title = title.textContent; // nama panjang terpotong: lengkapnya saat disorot
-    const meta = document.createElement('small');
-    meta.className = 'pmeta';
-    const info = document.createElement('span');
-    info.textContent = p.slots.length + ' frame · ' + (p.full ? 'dengan akun' : 'susunan saja');
-    info.title = p.full ? 'Nama frame dan akun Discord ikut tersimpan' : 'Hanya susunan; saat dipakai, frame jadi DC 1, DC 2, ...';
-    meta.append(info);
-    const key = appShortcuts.find(s => s.action.type === 'preset' && s.action.id === p.id)?.key;
-    if (key) { const k = document.createElement('kbd'); k.textContent = keyLabel(key); k.title = 'Shortcut'; meta.append(k); }
-    const acts = document.createElement('span');
-    acts.className = 'pacts';
-    row.append(title, presetBtn('Terapkan', () => applyPreset(p), 'apply'), meta, acts);
-    acts.append(
-      presetBtn('Timpa', b => {
-        if (!layout.slots.length) return setStatus('Belum ada frame untuk disimpan');
-        armed(b, 'Timpa', 'Klik lagi untuk menimpa', () => {
-          p.slots = presetSlots(layout.slots, p.full);
-          Object.assign(p, capturedSize());
-          commit();
-          renderPresets();
-          setStatus('Preset diperbarui');
-        });
-      }, 'over'),
-      presetBtn('Hapus', b => armed(b, 'Hapus', 'Klik lagi', () => {
-        layout.presets = layout.presets.filter(x => x !== p);
-        commit();
-        renderPresets();
-      }), 'del'));
-    return row;
-  });
+  const temp = pTab === 'temp';
+  for (const b of $('pTabs').children) b.setAttribute('aria-pressed', String(b.dataset.tab === pTab));
+  const q = $('pSearch').value.trim().toLowerCase();
+  const list = (temp ? layout.temp : layout.presets).filter(p => !q || [p.name, ...presetPeople(p)].some(x => x.toLowerCase().includes(q)));
+  const rows = list.map(p => presetRow(p, temp));
   if (!rows.length) {
     const e = document.createElement('p');
     e.className = 'hint';
-    e.textContent = 'Belum ada preset.';
+    e.textContent = q ? 'Tidak ada yang cocok.' : temp ? 'Temp masih kosong. Susunan yang tertimpa saat preset atau template diterapkan muncul di sini.' : 'Belum ada preset.';
     rows.push(e);
   }
   $('pList').replaceChildren(...rows);
@@ -307,6 +335,37 @@ function renderPresets() {
   $('moreBtn').hidden = !rest.length;
   $('moreBtn').textContent = pinned.length ? 'Lainnya ▾' : 'Pilih preset ▾';
   $('moreList').replaceChildren(...rest.map(quickPreset));
+}
+// Menu ⋯ satu baris: aksi yang jarang dipakai saat live (supaya tidak salah klik).
+function presetMenu(anchor, p, temp) {
+  const items = temp ? [
+    presetBtn('Simpan jadi preset', () => { $('pMenu').hidePopover(); openSaveDlg(anchor, { from: p }); }),
+    presetBtn('Hapus', b => armed(b, 'Hapus', 'Klik lagi', () => { layout.temp = layout.temp.filter(x => x !== p); $('pMenu').hidePopover(); commit(); renderPresets(); }), 'del'),
+  ] : [
+    presetBtn('Timpa dengan susunan sekarang', b => {
+      if (!layout.slots.length) return setStatus('Belum ada frame untuk disimpan');
+      armed(b, 'Timpa dengan susunan sekarang', 'Klik lagi untuk menimpa', () => {
+        p.slots = presetSlots(layout.slots, p.full);
+        Object.assign(p, capturedSize());
+        $('pMenu').hidePopover();
+        commit();
+        renderPresets();
+        setStatus('Preset diperbarui');
+      });
+    }, 'over'),
+    presetBtn('Ganti nama', () => { $('pMenu').hidePopover(); openSaveDlg(anchor, { rename: p }); }),
+    presetBtn(p.pinned ? 'Lepas sematan' : 'Sematkan di bawah kanvas', () => { p.pinned = !p.pinned; $('pMenu').hidePopover(); commit(); renderPresets(); }),
+    presetBtn('Hapus', b => armed(b, 'Hapus', 'Klik lagi', () => { layout.presets = layout.presets.filter(x => x !== p); $('pMenu').hidePopover(); commit(); renderPresets(); }), 'del'),
+  ];
+  $('pMenu').replaceChildren(...items);
+  popoverAt($('pMenu'), anchor);
+}
+// Popover di bawah tombolnya (naik ke atas bila tidak muat di layar).
+function popoverAt(pop, anchor) {
+  pop.showPopover();
+  const r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+  const top = r.bottom + 4 + h > innerHeight - 8 ? Math.max(8, r.top - 4 - h) : r.bottom + 4;
+  Object.assign(pop.style, { left: Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px', top: top + 'px', bottom: 'auto' });
 }
 const presetBtn = (text, fn, cls = '') => { const b = document.createElement('button'); b.type = 'button'; b.textContent = text; b.className = cls; b.onclick = () => fn(b); return b; };
 // Aksi yang tidak bisa dibatalkan: klik pertama mempersenjatai tombol, klik kedua dalam 3 detik menjalankan.
@@ -375,11 +434,23 @@ async function missingImages(slots) {
 }
 // Ukuran capture yang dipakai crop sekarang (untuk preset); tanpa capture: ukuran terakhir yang diketahui.
 const capturedSize = () => (video.videoWidth ? { frameW: video.videoWidth, frameH: video.videoHeight } : { frameW: layout.settings.frameW, frameH: layout.settings.frameH });
-async function applyPreset(p) {
+// Temp: susunan sekarang dicatat sebelum ditimpa preset atau template, supaya bisa kembali. Tidak dicatat bila
+// kosong, sama persis dengan preset tersimpan, atau sama dengan catatan Temp terakhir.
+function pushTemp(name) {
+  if (!layout.slots.length) return;
+  const slots = presetSlots(layout.slots, true), json = JSON.stringify(slots);
+  if (layout.temp[0] && JSON.stringify(layout.temp[0].slots) === json) return;
+  if (layout.presets.some(p => JSON.stringify(p.full ? slots : presetSlots(layout.slots, false)) === JSON.stringify(p.slots))) return;
+  layout.temp = [{ id: 't' + Date.now().toString(36), name: String(name).slice(0, 40), slots, pinned: false, full: true, ...capturedSize(), t: Date.now() }, ...layout.temp].slice(0, MAX_TEMP);
+  renderPresets();
+}
+// exact: kembali ke catatan Temp apa adanya (tanpa membawa frame Discord dari susunan sekarang).
+async function applyPreset(p, exact = false) {
+  pushTemp(exact ? 'Temp ' + tempTime(p.t) : p.name || 'Tanpa nama');
   for (const s of layout.slots) if (s.image) layout.library = rememberVirtual(layout.library, s); // virtual frame yang hilang dari kanvas tetap tersimpan
   // crop preset dibuat untuk ukuran capture saat disimpan: skalakan dulu ke capture sekarang (hanya slot dari preset)
   const scaled = p.frameW && video.videoWidth ? { ...p, slots: rescaleSlots(p.slots, { w: p.frameW, h: p.frameH }, frame()) } : p;
-  let next = withVirtualSources(applyPresetSlots(scaled, layout.slots), layout.library)
+  let next = withVirtualSources(exact ? structuredClone(scaled.slots) : applyPresetSlots(scaled, layout.slots), layout.library)
     .map(s => ({ ...s, crop: s.image ? s.crop : clampRect(s.crop, frame()), probe: clampRect(s.probe, frame()), place: clampRect(s.place, CANVAS) }));
   const gone = await missingImages(next); // frame tanpa gambar dilewati, bukan jadi kotak kosong di OBS
   if (gone.size) next = next.filter(s => !gone.has(s.image));
@@ -396,16 +467,44 @@ async function applyPreset(p) {
   const name = p.name || 'Tanpa nama';
   setStatus(gone.size ? 'Preset "' + name + '" diterapkan · ' + gone.size + ' virtual frame gambarnya hilang' : 'Preset "' + name + '" diterapkan');
 }
+// Popup simpan: preset baru dari susunan sekarang, ganti nama ({ rename: p }), atau simpan dari Temp ({ from: t }).
+let saveMode = {};
+function openSaveDlg(anchor, mode = {}) {
+  saveMode = mode;
+  const src = mode.from?.slots ?? layout.slots;
+  $('pSaveTitle').textContent = mode.rename ? 'Ganti nama preset' : 'Simpan preset';
+  $('pSaveOk').textContent = mode.rename ? 'Ganti nama' : 'Simpan';
+  $('pFullRow').hidden = !!mode.rename;
+  // saran nama: P + jumlah frame kamera, terpilih supaya bisa langsung ditimpa atau dilanjutkan ("P5 Freetalk")
+  $('pName').value = mode.rename ? mode.rename.name : 'P' + src.filter(s => !s.image).length;
+  popoverAt($('pSaveDlg'), anchor);
+  $('pName').select();
+}
 $('pSave').onclick = () => {
   if (!layout.slots.length) return setStatus('Belum ada frame untuk disimpan');
-  if (layout.presets.length >= 20) return setStatus('Maksimal 20 preset');
-  const full = $('pFull').checked;
-  layout.presets.push({ id: 'p' + Date.now().toString(36), name: $('pName').value.trim() || 'Preset ' + (layout.presets.length + 1), slots: presetSlots(layout.slots, full), pinned: false, full, ...capturedSize() });
-  $('pName').value = '';
+  if (layout.presets.length >= MAX_PRESETS) return setStatus('Maksimal 50 preset');
+  openSaveDlg($('pSave'));
+};
+$('pSaveDlg').onsubmit = e => {
+  e.preventDefault();
+  const name = $('pName').value.trim();
+  if (!name) return $('pName').focus();
+  if (saveMode.rename) {
+    saveMode.rename.name = name;
+    setStatus('Nama preset diganti');
+  } else {
+    if (layout.presets.length >= MAX_PRESETS) return setStatus('Maksimal 50 preset');
+    const full = $('pFull').checked, from = saveMode.from;
+    if (!from && !layout.slots.length) return setStatus('Belum ada frame untuk disimpan');
+    layout.presets.push({ id: 'p' + Date.now().toString(36), name, slots: presetSlots(from ? from.slots : layout.slots, full), pinned: false, full, ...(from ? { frameW: from.frameW, frameH: from.frameH } : capturedSize()) });
+    setStatus('Preset disimpan');
+  }
+  $('pSaveDlg').hidePopover();
   commit();
   renderPresets();
-  setStatus('Preset disimpan');
 };
+$('pTabs').onclick = e => { const t = e.target.closest('button')?.dataset.tab; if (t && t !== pTab) { pTab = t; renderPresets(); } };
+$('pSearch').oninput = () => renderPresets();
 
 $('slotStyleReset').onclick = () => {
   const s = selectedSlot();
@@ -545,6 +644,7 @@ $('capture').onclick = async () => {
 };
 
 let offerId = 0;
+let noPreview = false;
 async function offer() {
   if (!stream) return;
   pc?.close();
@@ -562,7 +662,7 @@ async function offer() {
   });
   // Penjaga: negosiasi yang macet di new/connecting tidak pernah jadi 'failed', jadi tidak akan dicoba ulang sendiri.
   setTimeout(() => {
-    if (pc === mine && stream && mine.connectionState !== 'connected') { log('offer_stuck', { state: mine.connectionState }); offer(); }
+    if (pc === mine && stream && !noPreview && mine.connectionState !== 'connected') { log('offer_stuck', { state: mine.connectionState }); offer(); }
   }, 10000);
   await mine.setLocalDescription();
   try {

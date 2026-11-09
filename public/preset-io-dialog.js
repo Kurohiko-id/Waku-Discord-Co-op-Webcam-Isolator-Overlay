@@ -4,7 +4,7 @@
 import { buildExport, parseImport, uniqueName } from '/shared/preset-io.js';
 
 const $ = id => document.getElementById(id);
-const MAX_PRESETS = 20;
+import { MAX_PRESETS } from '/shared/layout.js';
 const blobToDataUrl = blob => new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = fail; r.readAsDataURL(blob); });
 const dataUrlToBlob = d => { const [, type, b64] = d.match(/^data:(.*?);base64,(.*)$/); return new Blob([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], { type }); };
 const fileSafe = s => s.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'preset';
@@ -106,7 +106,7 @@ export function createPresetIoDialogs({ presets, onImport, log, copyText, fmtByt
     const picked = imRows.filter(r => r.check.checked);
     if (!picked.length) { $('imInfo').textContent = 'Pilih minimal satu preset.'; return; }
     const room = MAX_PRESETS - presets().length;
-    if (picked.length > room) { $('imInfo').textContent = room > 0 ? 'Hanya bisa menambah ' + room + ' preset lagi (maksimal 20).' : 'Sudah 20 preset. Hapus beberapa dulu.'; return; }
+    if (picked.length > room) { $('imInfo').textContent = room > 0 ? 'Hanya bisa menambah ' + room + ' preset lagi (maksimal 50).' : 'Sudah 50 preset. Hapus beberapa dulu.'; return; }
     $('imSave').disabled = true;
     const moved = {}; // gambar dari file diunggah ke server; alamat lama -> alamat baru
     for (const url of imagesOf(picked.map(r => r.preset))) {
