@@ -10,6 +10,7 @@ import { resolveStyle, defaultStyle, TEMPLATES, validatePartialStyle, mergeStyle
 import { createStyleForm } from '/style-form.js';
 import { SAFE_ZONES } from '/shared/safezones.js';
 import { sameSize, sameRatio, toGrid, autoLayout } from '/shared/bulk.js';
+import { alignRects, axisOf, distribute, spaceRects, tidy, unionRect } from '/shared/align.js';
 import { buildTile, updateTile } from '/shared/tile-dom.js';
 import { Stat, createLogger, watchIce } from '/shared/log.js';
 import { iceDone } from '/shared/rtc.js';
@@ -23,6 +24,7 @@ const SNAP = 16;
 
 let layout = { slots: [], settings: { animate: true, greenMin: 0.02, detectEnabled: true }, style: defaultStyle(), template: 'sticker-night', guides: { x: [], y: [] }, presets: [], library: [] };
 let selected = null;
+const group = new Set(); // pilih banyak (Ctrl+klik / tarik kotak): >= 2 id, digeser bersama; selected = yang terakhir diklik
 let stream = null;
 let pc = null;
 const boxes = new Map(); // slotId -> { tile, canvas, ctx }
@@ -833,12 +835,14 @@ const TRASH_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" strok
 function render() {
   $('layoutInner').replaceChildren();
   boxes.clear();
+  for (const id of group) if (!layout.slots.some(s => s.id === id && s.enabled)) group.delete(id); // dihapus/disembunyikan/preset baru
+  if (group.size < 2) group.clear();
   for (const s of layout.slots) {
     if (!s.enabled) continue;
     const { el: tile, canvas } = buildTile(s, slotStyle(s));
     tile.classList.add('tile');
     tile.classList.toggle('locked', s.placeLocked);
-    tile.classList.toggle('sel', s.id === selected);
+    tile.classList.toggle('sel', s.id === selected || group.has(s.id));
     tile.classList.toggle('speaking', !!speaking.get(s.id)); // pose bicara bertahan setelah render ulang
     const edit = document.createElement('button');
     edit.type = 'button';
@@ -877,35 +881,61 @@ function render() {
     };
     tile.append(edit, del, reset);
     const handles = [...addCorners(tile), ...addCorners(tile, ['n', 's', 'e', 'w'])]; // sisi hanya aktif saat Alt (lihat CSS body.alt)
-    tile.addEventListener('pointerdown', () => select(s.id));
+    // Ctrl+klik: tambah/lepas dari pilihan. Klik biasa di luar pilihan: kembali pilih satu.
+    tile.addEventListener('pointerdown', e => {
+      dropped = false;
+      if (e.ctrlKey || e.metaKey) {
+        if (!group.size && selected && selected !== s.id && boxes.has(selected)) group.add(selected);
+        if (group.has(s.id)) {
+          group.delete(s.id);
+          dropped = true; // yang baru dilepas tidak ikut digeser
+          const next = [...group].at(-1) ?? null;
+          if (group.size < 2) group.clear();
+          selected = null; select(next); markSel();
+          return;
+        }
+        group.add(s.id);
+        if (group.size < 2) group.clear();
+      } else if (!group.has(s.id)) group.clear();
+      select(s.id); markSel();
+    });
     tile.addEventListener('dblclick', () => { select(s.id); showTab('panelSlot'); }); // klik dua kali: buka pengaturan Slot di kiri
     canvas.width = 320; canvas.height = 180;
     $('layoutInner').append(tile);
     boxes.set(s.id, { tile, canvas });
 
-    let cropStart = null, placeStart = null;
+    let cropStart = null, placeStart = null, moving = [], starts = [], bb = null;
     attachDrag(tile, handles, {
       get: () => s.place,
       scale: layoutScale,
-      canResize: () => !s.placeLocked,
-      begin: () => { select(s.id); cropStart = { ...s.crop }; placeStart = { ...s.place }; }, // yang diubah = yang terpilih (acuan Jadikan ukuran utama)
+      canResize: () => !s.placeLocked && !dropped,
+      begin: () => {
+        if (dropped) { moving = []; return; }
+        select(s.id); cropStart = { ...s.crop }; placeStart = { ...s.place }; // yang diubah = yang terpilih (acuan Jadikan ukuran utama)
+        moving = group.has(s.id) ? layout.slots.filter(o => group.has(o.id) && o.enabled) : [s];
+        starts = moving.map(o => ({ ...o.place }));
+        bb = unionRect(starts);
+      },
+      // Digeser sebagai satu kotak gabungan: magnet dan jarak dihitung dari kotak itu terhadap frame lain.
       move: (r, alt) => {
-        const others = layout.slots.filter(o => o !== s && o.enabled).map(o => o.place);
-        const sn = alt ? { x: r.x, y: r.y, guides: { x: [], y: [] } } : snapRect(r, others, CANVAS, SNAP, layout.guides);
+        if (!moving.length) return;
+        const box = { ...bb, x: bb.x + r.x - placeStart.x, y: bb.y + r.y - placeStart.y };
+        const others = layout.slots.filter(o => !moving.includes(o) && o.enabled).map(o => o.place);
+        const sn = alt ? { x: box.x, y: box.y, guides: { x: [], y: [] } } : snapRect(box, others, CANVAS, SNAP, layout.guides);
         // Jarak sama dengan jarak antar frame lain (atau tengah di antara dua frame): menang bila lebih dekat dari magnet tepi.
         const gaps = [];
         if (!alt) {
-          const sp = snapSpacing(r, others, SNAP);
+          const sp = snapSpacing(box, others, SNAP);
           for (const a of ['x', 'y']) {
-            const edge = Math.abs(sn[a] - r[a]);
+            const edge = Math.abs(sn[a] - box[a]);
             if (!sp[a] || (sn.guides[a].length && Math.abs(sp[a].d) > edge)) continue;
             if (!sn.guides[a].length || Math.abs(sp[a].d) < edge) sn.guides[a] = []; // seri: garis tepi tetap tampil
-            sn[a] = r[a] + sp[a].d;
+            sn[a] = box[a] + sp[a].d;
             gaps.push(...sp[a].marks);
           }
         }
-        s.place = { ...r, x: sn.x, y: sn.y };
-        showGuides(withAligned(sn.guides, s.place, others), $('layoutInner'), 1);
+        moving.forEach((o, i) => { o.place = { ...starts[i], x: starts[i].x + sn.x - bb.x, y: starts[i].y + sn.y - bb.y }; });
+        showGuides(withAligned(sn.guides, { ...bb, x: sn.x, y: sn.y }, others), $('layoutInner'), 1);
         showGaps($('layoutInner'), 1, gaps);
         positionAll(); commitSoon();
       },
@@ -938,6 +968,7 @@ function render() {
   renderGuides();
   positionAll();
   fillForm();
+  showArrange();
   fillGeneral();
   renderPresets();
   renderLibInfo();
@@ -958,10 +989,77 @@ const renderSoon = () => { renderReq ||= requestAnimationFrame(() => { renderReq
 function select(id) {
   if (selected === id) return;
   selected = id;
-  for (const [sid, b] of boxes) b.tile.classList.toggle('sel', sid === id);
+  markSel();
   fillForm();
   drawRulers();
 }
+function markSel() {
+  for (const [sid, b] of boxes) b.tile.classList.toggle('sel', sid === selected || group.has(sid));
+  showArrange();
+}
+
+// ---- rata dan jarak (bar di judul kanvas): pilih banyak = acuan kotak gabungan, satu frame = acuan kanvas ----
+const arrangeTargets = () => layout.slots.filter(s => s.enabled && (group.size ? group.has(s.id) : s.id === selected));
+function showArrange() {
+  const n = arrangeTargets().length;
+  $('arrange').hidden = !n;
+  $('dsH').disabled = $('dsV').disabled = n < 3;
+  $('arGap').disabled = $('tidy').disabled = n < 2;
+}
+function arrange(fn) {
+  const ss = arrangeTargets();
+  if (!ss.length) return;
+  const out = fn(ss.map(s => s.place));
+  ss.forEach((s, i) => { s.place = clampRect(out[i], CANVAS); });
+  positionAll(); drawRulers(); commit();
+}
+for (const [id, mode] of [['alL', 'left'], ['alH', 'hcenter'], ['alR', 'right'], ['alT', 'top'], ['alV', 'vcenter'], ['alB', 'bottom']]) {
+  $(id).onclick = () => arrange(rs => alignRects(rs, mode, rs.length > 1 ? undefined : { x: 0, y: 0, ...CANVAS }));
+}
+$('dsH').onclick = () => arrange(rs => distribute(rs, 'x'));
+$('dsV').onclick = () => arrange(rs => distribute(rs, 'y'));
+const arGap = () => Math.min(400, Math.max(0, Math.round(Number($('arGap').value) || 0)));
+$('arGap').onchange = () => arrange(rs => spaceRects(rs, axisOf(rs), arGap()));
+$('tidy').onclick = () => arrange(rs => tidy(rs, arGap()));
+let dropped = false; // pointerdown terakhir = Ctrl+klik yang melepas frame dari pilihan: jangan digeser
+const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+// Tarik kotak di area kosong: pilih semua frame yang tersentuh (Ctrl = tambahkan ke pilihan). Klik saja = batal pilih banyak.
+$('layoutStage').addEventListener('pointerdown', e => {
+  if (e.button !== 0 || e.target.closest('.tile, .ug, button, input, select, label, a, [popover]')) return; // tombol di atas kanvas tetap bisa diklik
+  const stage = $('layoutStage'), add = e.ctrlKey || e.metaKey, a = stagePoint(e);
+  const mq = document.createElement('div');
+  mq.className = 'marquee';
+  let rect = { x: a.x, y: a.y, w: 0, h: 0 };
+  const move = ev => {
+    const b = stagePoint(ev);
+    rect = { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
+    if (!mq.isConnected) $('layoutInner').append(mq);
+    place(mq, rect, 1);
+  };
+  const up = () => {
+    stage.removeEventListener('pointermove', move);
+    stage.removeEventListener('pointerup', up);
+    stage.removeEventListener('pointercancel', up);
+    mq.remove();
+    const hits = rect.w < 6 && rect.h < 6 ? [] : layout.slots.filter(s => s.enabled && boxes.has(s.id) && overlaps(s.place, rect)).map(s => s.id);
+    const ids = new Set(add ? [...group, ...(selected && boxes.has(selected) ? [selected] : [])] : []);
+    for (const id of hits) ids.add(id);
+    group.clear();
+    if (ids.size >= 2) for (const id of ids) group.add(id);
+    const primary = hits.at(-1) ?? (ids.has(selected) || !ids.size ? selected : [...ids].at(-1));
+    if (primary !== selected) select(primary);
+    markSel();
+  };
+  stage.setPointerCapture(e.pointerId);
+  stage.addEventListener('pointermove', move);
+  stage.addEventListener('pointerup', up);
+  stage.addEventListener('pointercancel', up);
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || !group.size || document.querySelector('dialog[open], :popover-open')) return;
+  group.clear(); markSel();
+});
 
 function deleteSlot(id) {
   layout.library = rememberVirtual(layout.library, layout.slots.find(s => s.id === id)); // virtual frame tetap ada di daftar

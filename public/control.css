@@ -275,6 +275,7 @@ select { width: 100%; }
 .tile { cursor: move; touch-action: none; container-type: size; } /* cqmin = sisi pendek tile: ikon mengecil bersama tile dan layar */
 .tile canvas { pointer-events: none; }
 .tile.sel { outline: calc(2px / var(--k, .5)) solid var(--accent); outline-offset: calc(6px / var(--k, .5)); }
+.marquee { position: absolute; z-index: 6; border: calc(1px / var(--k, .5)) solid var(--accent); background: var(--accent-soft); pointer-events: none; }
 .tile :is(.edit, .del, .reset) { --s: min(calc(30px / var(--k, .5)), 24cqmin); position: absolute; right: calc(var(--s) * .27); top: calc(var(--s) * .27); z-index: 4; display: grid; place-items: center; width: var(--s); height: var(--s); min-height: 0; padding: 0; border: 0; border-radius: calc(var(--s) * .23); background: #1c1c1ce6; color: var(--ink); box-shadow: 0 calc(2px / var(--k, .5)) calc(8px / var(--k, .5)) #0008; }
 .tile .edit { right: calc(var(--s) * 1.5); } /* pensil di kiri tombol hapus */
 .tile .reset { right: auto; left: calc(var(--s) * .27); } /* kiri atas */
@@ -605,3 +606,12 @@ label:has(> input[type=checkbox]) { justify-content: flex-start; }
   #collapse { display: none; }
   .work.collapsed .drawer { opacity: 1; pointer-events: auto; border-width: 1px; }
 }
+
+/* Rata dan jarak (muncul saat ada frame terpilih), menggantikan teks ukuran kanvas di judul */
+.arrange { margin-left: auto; margin-block: -8px; display: flex; align-items: center; gap: 2px; align-self: center; } /* margin negatif: judul tidak bertambah tinggi, kanvas tidak loncat */
+.arrange:not([hidden]) + small { display: none; }
+.arrange .btn.icon { width: 30px; height: 30px; }
+.arrange .btn.icon:disabled { opacity: .35; }
+.arrange .sep { width: 1px; height: 18px; margin: 0 6px; background: var(--line-2); }
+.ar-gap { display: flex; align-items: center; gap: 6px; margin: 0 4px 0 8px; font-size: 12px; color: var(--ink3); }
+.ar-gap input { width: 58px; height: 28px; }
