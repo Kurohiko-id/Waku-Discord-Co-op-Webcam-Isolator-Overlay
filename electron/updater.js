@@ -4,8 +4,15 @@
 //
 // status: dev (bukan installer) | idle | checking | none (sudah terbaru) | available | downloading | ready | error
 // manual = cek dari tombol: hanya cek manual yang menampilkan error (cek saat start yang gagal, mis. offline, diam saja).
+// Cek otomatis yang menemukan versi baru memberi prompt: true (popup) paling banyak sekali sehari,
+// kecuali versi itu sudah dilewati. store = { get(): { skip, day }, set(obj) } menyimpan pilihan itu antar sesi.
 
-export function createUpdater({ updater, packaged, send, log = () => {} }) {
+// fullChangelog: catatan semua versi yang terlewat (terbaru dulu), jadi yang lama tidak update tetap tahu semua fitur baru
+const notesOf = (n, version) => (Array.isArray(n) ? n.filter(x => x?.note).map(x => ({ version: x.version, note: x.note }))
+  : typeof n === 'string' && n ? [{ version, note: n }] : []);
+const today = () => new Date().toDateString();
+
+export function createUpdater({ updater, packaged, send, log = () => {}, store = memoryStore() }) {
   let state = { status: packaged ? 'idle' : 'dev' };
   let manual = false, lastErr = null;
   const set = s => { state = s; send(state); };
@@ -25,12 +32,20 @@ export function createUpdater({ updater, packaged, send, log = () => {} }) {
   if (packaged) {
     updater.autoDownload = false;
     updater.autoInstallOnAppQuit = false;
+    updater.fullChangelog = true;
     updater.logger = null;
     updater.on('checking-for-update', () => set({ status: 'checking' }));
-    updater.on('update-available', info => { log('update_available', { version: info?.version }); set({ status: 'available', version: info?.version }); });
+    updater.on('update-available', info => {
+      const version = info?.version, notes = notesOf(info?.releaseNotes, version), prefs = store.get();
+      log('update_available', { version });
+      const s = { status: 'available', version, ...(notes.length && { notes }) };
+      if (version === prefs.skip) s.skipped = true;
+      else if (!manual && prefs.day !== today()) { s.prompt = true; store.set({ ...prefs, day: today() }); }
+      set(s);
+    });
     updater.on('update-not-available', () => set({ status: 'none' }));
-    updater.on('download-progress', p => set({ status: 'downloading', version: state.version, percent: Math.floor(p?.percent ?? 0) }));
-    updater.on('update-downloaded', info => { log('update_ready', { version: info?.version }); set({ status: 'ready', version: info?.version ?? state.version }); });
+    updater.on('download-progress', p => set({ status: 'downloading', version: state.version, ...(state.notes && { notes: state.notes }), percent: Math.floor(p?.percent ?? 0) }));
+    updater.on('update-downloaded', info => { log('update_ready', { version: info?.version }); set({ status: 'ready', version: info?.version ?? state.version, ...(state.notes && { notes: state.notes }) }); });
     updater.on('error', fail);
   }
 
@@ -42,9 +57,22 @@ export function createUpdater({ updater, packaged, send, log = () => {} }) {
       updater.checkForUpdates().catch(fail);
       return state;
     },
+    // popup sudah ditampilkan: jangan muncul lagi saat halaman dimuat ulang
+    seen() {
+      if (state.prompt) { const { prompt, ...rest } = state; state = rest; }
+      return state;
+    },
+    // Lewati versi ini: tidak ada popup atau tanda Update lagi sampai versi yang lebih baru keluar
+    skip() {
+      if (state.status !== 'available') return state;
+      store.set({ ...store.get(), skip: state.version });
+      const { prompt, ...rest } = state;
+      set({ ...rest, skipped: true });
+      return state;
+    },
     download() {
       if (state.status !== 'available') return state;
-      set({ status: 'downloading', version: state.version, percent: 0 });
+      set({ status: 'downloading', version: state.version, ...(state.notes && { notes: state.notes }), percent: 0 });
       updater.downloadUpdate().catch(fail);
       return state;
     },
@@ -55,4 +83,9 @@ export function createUpdater({ updater, packaged, send, log = () => {} }) {
       return true;
     },
   };
+}
+
+function memoryStore() {
+  let v = {};
+  return { get: () => v, set: x => { v = x; } };
 }

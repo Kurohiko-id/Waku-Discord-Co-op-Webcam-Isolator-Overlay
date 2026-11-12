@@ -237,6 +237,8 @@ const EN = {
   'Waku sudah versi terbaru.': 'Waku is up to date.', 'Update hanya tersedia di versi installer.': 'Updates are only available in the installed version.',
   'Restart & pasang': 'Restart & install', 'Klik lagi untuk restart': 'Click again to restart', 'siap': 'ready',
   'Ada versi baru Waku. Klik untuk melihat.': 'A new version of Waku is available. Click to view.',
+  'Update Waku': 'Update Waku', 'Versi sekarang': 'Current version', 'Versi terbaru': 'Latest version', 'Alasan kenapa harus update': 'Why you should update', 'Lihat semua perubahan': 'See all changes',
+  'Lewati versi ini': 'Skip this version', 'Nanti': 'Later', 'Coba lagi': 'Try again',
   'Belum ada rilis yang bisa diunduh.': 'No release available to download yet.', 'Tidak bisa terhubung ke GitHub. Cek koneksi internet.': 'Can’t reach GitHub. Check your internet connection.',
 
   // export / import preset
@@ -296,7 +298,7 @@ const PATTERNS = [
   [/^Sebelum (.*)$/s, 'Before $1'],
   [/^Port (\d+) sedang dipakai program lain\.$/, 'Port $1 is in use by another program.'],
   [/^Versi (.+) tersedia\.$/, 'Version $1 is available.'],
-  [/^Unduh versi (.+)$/, 'Download version $1'],
+  [/^Lihat versi (.+)$/, 'View version $1'],
   [/^Mengunduh versi (.+)\.\.\. (\d+)%$/, 'Downloading version $1... $2%'],
   [/^Versi (.+) siap dipasang\. Waku akan ditutup sebentar lalu terbuka lagi; capture perlu diulang\.$/, 'Version $1 is ready to install. Waku will close briefly and reopen; you’ll need to capture again.'],
   [/^Gagal: (.*)$/s, (_, m) => 'Failed: ' + tr(m)],

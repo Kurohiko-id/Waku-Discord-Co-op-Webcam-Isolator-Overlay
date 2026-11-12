@@ -35,7 +35,7 @@ test('alur lengkap: tersedia -> unduh -> progres -> siap -> pasang', () => {
   up.check();
   u.emit('checking-for-update');
   u.emit('update-available', { version: '1.1.0' });
-  assert.deepEqual(up.state(), { status: 'available', version: '1.1.0' });
+  assert.deepEqual(up.state(), { status: 'available', version: '1.1.0', prompt: true });
   assert.equal(up.install(), false); // belum diunduh
   up.download();
   u.emit('download-progress', { percent: 63.7 });
@@ -86,4 +86,44 @@ test('unduhan gagal selalu ditampilkan, dan bisa dicek ulang', async () => {
   assert.deepEqual(up.state(), { status: 'error', msg: 'disk penuh' });
   up.check(true);
   assert.deepEqual(u.calls, ['check', 'download', 'check']);
+});
+
+test('popup otomatis maks. sekali sehari, tidak untuk cek manual, dan tidak untuk versi yang dilewati', () => {
+  let saved = {};
+  const store = { get: () => saved, set: v => { saved = v; } };
+  const open = () => { const u = fake(); return { u, up: createUpdater({ updater: u, packaged: true, send: () => {}, store }) }; };
+  const a = open();
+  a.up.check();
+  a.u.emit('update-available', { version: '1.1.0', releaseNotes: '<h2>English</h2><p>New</p>' });
+  assert.equal(a.up.state().prompt, true);
+  assert.deepEqual(a.up.state().notes, [{ version: '1.1.0', note: '<h2>English</h2><p>New</p>' }]);
+  assert.equal(a.u.fullChangelog, true);
+  assert.equal(a.up.seen().prompt, undefined); // dimuat ulang: tidak muncul lagi
+  const b = open(); // Waku dibuka lagi hari yang sama
+  b.up.check();
+  b.u.emit('update-available', { version: '1.1.0' });
+  assert.equal(b.up.state().prompt, undefined);
+  saved.day = 'kemarin';
+  const c = open();
+  c.up.check(true); // cek manual: popup dibuka oleh tombol, bukan prompt
+  c.u.emit('update-available', { version: '1.1.0' });
+  assert.equal(c.up.state().prompt, undefined);
+  c.up.skip();
+  assert.equal(saved.skip, '1.1.0');
+  assert.equal(c.up.state().skipped, true);
+  const d = open();
+  d.up.check();
+  d.u.emit('update-available', { version: '1.1.0' });
+  assert.deepEqual([d.up.state().prompt, d.up.state().skipped], [undefined, true]);
+  const e = open(); // versi lebih baru: muncul lagi
+  e.up.check();
+  e.u.emit('update-available', { version: '1.2.0' });
+  assert.equal(e.up.state().prompt, true);
+});
+
+test('catatan semua versi yang terlewat ikut dikirim, terbaru dulu', () => {
+  const { u, up } = setup();
+  up.check();
+  u.emit('update-available', { version: '2.0.0', releaseNotes: [{ version: '2.0.0', note: '<p>b</p>' }, { version: '1.0.7', note: '<p>a</p>' }, { version: '1.0.6', note: null }] });
+  assert.deepEqual(up.state().notes, [{ version: '2.0.0', note: '<p>b</p>' }, { version: '1.0.7', note: '<p>a</p>' }]);
 });

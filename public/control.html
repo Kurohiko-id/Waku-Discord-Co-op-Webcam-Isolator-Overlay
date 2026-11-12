@@ -377,6 +377,20 @@
   </div>
   <div class="dlg-foot"><span class="grow"></span><button id="supportClose" class="btn" type="button">Tutup</button></div>
 </dialog>
+<dialog id="updDlg" aria-labelledby="updTitle">
+  <div class="dlg-head"><h2 id="updTitle">Update Waku</h2></div>
+  <div class="dc-body">
+    <div class="upd-vers">
+      <div><span>Versi sekarang</span><b id="updCur"></b></div>
+      <div><span>Versi terbaru</span><b id="updNew"></b></div>
+    </div>
+    <p class="hint" id="updMsg" role="status"></p>
+    <div class="upd-bar" id="updBar" hidden><i id="updBarFill"></i></div>
+    <div class="upd-hl" id="updHl" hidden><h3>Alasan kenapa harus update</h3><ul id="updHlList"></ul></div>
+    <details class="upd-all" id="updAll" hidden><summary>Lihat semua perubahan</summary><div class="upd-notes" id="updNotes"></div></details>
+  </div>
+  <div class="dlg-foot"><button id="updSkip" class="btn" type="button" hidden>Lewati versi ini</button><span class="grow"></span><button id="updLater" class="btn" type="button">Nanti</button><button id="updGo" class="btn primary" type="button" hidden>Update</button></div>
+</dialog>
 <dialog id="exDlg" aria-labelledby="exTitle">
   <div class="dlg-head"><h2 id="exTitle">Export preset</h2></div>
   <div class="dc-body">

@@ -220,14 +220,23 @@ app.on('will-quit', shortcuts.clear);
 // Update dari GitHub Releases: dicek sekali saat Waku dibuka; unduh dan pasang hanya lewat tombol di halaman kontrol.
 const updates = createUpdater({
   updater: app.isPackaged ? updaterPkg.autoUpdater : null, packaged: app.isPackaged,
-  log: mainLog, send: s => win?.webContents.send('app:update', s),
+  log: mainLog, send: s => win?.webContents.send('app:update', { ...s, current: app.getVersion() }),
+  store: (() => { // pilihan popup update (versi yang dilewati, hari terakhir popup muncul)
+    const file = path.join(app.getPath('userData'), 'update-prefs.json');
+    return {
+      get: () => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return {}; } },
+      set: v => { try { fs.writeFileSync(file, JSON.stringify(v)); } catch { /* popup bisa muncul lagi besok, tidak apa-apa */ } },
+    };
+  })(),
 });
 ipcMain.handle('app:update', (e, action) => {
   if (!fromMain(e)) return null;
   if (action === 'check') return updates.check(true);
   if (action === 'download') return updates.download();
+  if (action === 'skip') return updates.skip();
+  if (action === 'seen') return { ...updates.seen(), current: app.getVersion() };
   if (action === 'install') { if (updates.state().status === 'ready') quitting = true; return updates.install(); } // jendela tidak sembunyi ke tray
-  return updates.state();
+  return { ...updates.state(), current: app.getVersion() };
 });
 ipcMain.handle('app:freePort', e => (fromMain(e) ? freePort() : null));
 ipcMain.handle('app:setPort', async (e, value) => {
