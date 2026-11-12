@@ -182,9 +182,29 @@ function resetBulk() {
   bulk.snapshot = null; bulk.width = false; bulk.ratio = null; bulk.grid = false; bulk.auto = null; bulk.preset = false;
   $('aKind').value = '';
   setUndo(false);
+  drawKinds();
+}
+// Template otomatis sebagai gambar: tiap tombol menggambar hasil autoLayout untuk frame aktif sekarang
+// (jumlah, urutan, rasio crop, jarak), jadi terlihat tanpa membaca. Dropdown aslinya tetap jadi sumber nilai.
+function drawKinds() {
+  const act = layout.slots.filter(s => s.enabled), gap = Number($('aGap').value);
+  const key = act.map(s => s.id + ':' + (s.crop.w / s.crop.h).toFixed(3) + ':' + !!s.image).join() + '|' + gap;
+  if (key !== drawKinds.key) {
+    drawKinds.key = key;
+    const kinds = [...$('aKind').options].filter(o => o.value);
+    for (const host of [$('aKinds'), $('qKinds')]) host.replaceChildren(...kinds.map(o => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'kind'; b.dataset.kind = o.value; b.title = o.text; b.setAttribute('aria-label', o.text);
+      const rects = autoLayout(act, o.value, gap, CANVAS).map(s => `<rect class="${s.image ? 'v' : 't'}" x="${s.place.x}" y="${s.place.y}" width="${s.place.w}" height="${s.place.h}" rx="24"/>`).join('');
+      b.innerHTML = `<svg viewBox="0 0 1920 1080" aria-hidden="true"><rect class="c" width="1920" height="1080" rx="40"/>${rects}</svg>`;
+      b.onclick = () => { $('aKind').value = o.value; $('aKind').dispatchEvent(new Event('change')); syncQuick(); };
+      return b;
+    }));
+  }
+  for (const b of document.querySelectorAll('.kind')) b.setAttribute('aria-pressed', String(b.dataset.kind === $('aKind').value));
 }
 const setUndo = on => { for (const id of ['bUndo', 'pUndo', 'aUndo']) $(id).disabled = !on; };
-function runBulk() {
+function runBulk(transition = false) {
   // setelah preset diterapkan, snapshot masih layout sebelum preset (untuk Urungkan): aksi massal harus mulai dari layout sekarang
   if (!bulk.snapshot || bulk.preset) { bulk.snapshot = structuredClone(layout.slots); bulk.preset = false; setUndo(true); }
   let slots = structuredClone(bulk.snapshot);
@@ -197,7 +217,7 @@ function runBulk() {
   layout.slots = slots;
   renderSoon(); // slider mengirim input ~60x/detik: bangun ulang editor paling sering sekali per frame
   clearTimeout(bulkTimer);
-  bulkTimer = setTimeout(sendLayout, 60);
+  bulkTimer = setTimeout(() => sendLayout(transition), 60); // true = template otomatis dipilih: dianimasikan di OBS
 }
 for (const id of ['bWidth', 'bCols', 'bGap']) {
   $(id).oninput = e => {
@@ -226,10 +246,12 @@ $('aKind').onchange = e => {
   if (!bulk.snapshot || bulk.preset) pushTemp('template ' + e.target.selectedOptions[0].text); // awal sesi template: susunan sebelumnya ke Temp
   bulk.width = false; bulk.grid = false;
   bulk.auto = { kind: e.target.value, gap: Number($('aGap').value) };
-  runBulk();
+  runBulk(true);
+  drawKinds();
 };
 $('aGap').oninput = e => {
   $('aGapVal').textContent = e.target.value;
+  drawKinds();
   if (!bulk.auto) return;
   bulk.auto.gap = Number(e.target.value);
   runBulk();
@@ -465,7 +487,7 @@ async function applyPreset(p, exact = false) {
   layout.slots = next;
   if (!layout.slots.some(s => s.id === selected)) selected = null;
   render();
-  sendLayout();
+  sendLayout(true);
   const name = p.name || 'Tanpa nama';
   setStatus(gone.size ? 'Preset "' + name + '" diterapkan · ' + gone.size + ' virtual frame gambarnya hilang' : 'Preset "' + name + '" diterapkan');
 }
@@ -525,12 +547,15 @@ function setStatus(t, sticky = false) {
 function chips() { // status Capture dan Deteksi di bar atas
   const set = (id, on, yes, no) => { $(id).textContent = on ? yes : no; $(id).className = on ? 'on' : 'off'; };
   if (!$('capture').classList.contains('busy')) set('capState', !!stream, 'aktif', 'mati'); // sedang disiapkan: tetap "menyiapkan..."
+  window.wakuApp?.setCapturing(!!stream); // menu tray menampilkan "Hentikan capture"
   set('detState', layout.settings.detectEnabled, 'nyala', 'mati');
   reportDeck();
 }
 $('detChip').onclick = () => $('sDetect').click();
+$('capChip').onclick = () => (stream ? stopCapture(true) : $('capture').click()); // aktif: hentikan; mati: capture
 
-const sendLayout = () => { record(); ws.send({ type: 'layout', layout }); };
+// transition = true: pindah preset, OBS menganimasikan perpindahannya
+const sendLayout = (transition = false) => { record(); ws.send({ type: 'layout', layout, transition: transition === true }); };
 
 // ---- urungkan / ulangi (Ctrl+Z, Ctrl+Y atau Ctrl+Shift+Z) ----
 // Tiap layout yang dikirim dicatat. Perubahan beruntun (drag mengirim ~20x/detik) yang jaraknya < 500 ms
@@ -577,13 +602,15 @@ function commitSoon() {
 
 // ---- capture + WebRTC sender ----
 let trackMuted = false; // jendela Discord di-minimize/beku: tidak ada frame baru, deteksi jangan membaca frame lama
-function stopCapture() {
+// byUser: chip Capture di bar atas / menu tray. OBS diberi tahu supaya tile langsung disembunyikan.
+function stopCapture(byUser = false) {
   if (!stream) return;
   stream.getTracks().forEach(t => t.stop());
   stream = null;
   video.srcObject = null;
   pc?.close();
   pc = null;
+  if (byUser) { ws.send({ type: 'signal', data: { stop: true } }); log('capture_stop', {}); setStatus('Capture dihentikan'); }
   chips();
 }
 // Capture sedang disiapkan (picker terbuka, lalu menunggu frame pertama): tombol Capture jadi penanda proses.
@@ -833,6 +860,7 @@ const RESET_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" strok
 const TRASH_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
 
 function render() {
+  drawKinds();
   $('layoutInner').replaceChildren();
   boxes.clear();
   for (const id of group) if (!layout.slots.some(s => s.id === id && s.enabled)) group.delete(id); // dihapus/disembunyikan/preset baru
@@ -973,6 +1001,7 @@ function render() {
   renderPresets();
   renderLibInfo();
   $('sAnimate').checked = layout.settings.animate;
+  $('pTransition').value = String(layout.settings.transitionMs ?? 400);
   $('oBitrate').value = layout.settings.bitrate;
   $('oBitrateVal').textContent = layout.settings.bitrate;
   $('oFps').value = layout.settings.fps;
@@ -1175,6 +1204,7 @@ $('fPlaceLock').onchange = e => {
 };
 $('fEnabled').onchange = e => { selectedSlot().enabled = e.target.checked; commit(); render(); };
 $('sAnimate').onchange = e => { layout.settings.animate = e.target.checked; commit(); };
+$('pTransition').onchange = e => { layout.settings.transitionMs = Number(e.target.value); commit(); };
 $('sGreen').oninput = e => {
   layout.settings.greenMin = Number(e.target.value);
   $('sGreenVal').textContent = e.target.value;
@@ -1736,7 +1766,8 @@ if (window.wakuApp?.onCommand) {
 
 // ---- perintah dari shortcut global dan plugin Stream Deck ----
 function runCommand(cmd) {
-  if (cmd?.type === 'detect') {
+  if (cmd?.type === 'capture') stopCapture(true); // menu tray: hanya untuk menghentikan
+  else if (cmd?.type === 'detect') {
     const want = cmd.set === 'on' ? true : cmd.set === 'off' ? false : !layout.settings.detectEnabled;
     if (want !== layout.settings.detectEnabled) $('sDetect').click();
   } else if (cmd?.type === 'template') {

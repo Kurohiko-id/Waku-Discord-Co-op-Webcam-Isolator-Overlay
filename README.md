@@ -93,6 +93,26 @@ Click **Install Stream Deck plugin** to install the plugin, or use a Stream Deck
 
 To report a bug, open **Settings → Bug report**, click **Copy info**, and paste it into [Issues](https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator-Overlay/issues). The report contains no Discord token or secret.
 
+## Privacy
+
+Hi, I'm Kurohiko, a VTuber and the developer of Waku. I care a lot about your privacy.
+
+To keep Waku moving in the right direction, I need a few basic numbers: how many people install Waku, which features get used, and which operating system you're on. That tells me which features are popular and worth improving, and which ones hardly anyone uses.
+
+All of this is **fully anonymous**. I don't know who installed Waku, and I don't know who uses which feature.
+
+**What is sent:**
+
+- A random ID created the first time Waku opens. It isn't linked to your accounts, your name, or your device.
+- Waku version, Windows version, and system language.
+- Country, estimated from the connection. IP addresses are not stored.
+- Names of the features in use, such as Official/Manual speaking mode, image frames, frame count, effects, and Stream Deck. Each feature is counted at most once a day, so there is no per-click record.
+- Error messages when something goes wrong, with your user folder name masked.
+
+**Never sent:** Discord accounts or tokens, your friends' names, frame names, layout and preset contents, uploaded images, screenshots, or video.
+
+The data goes to my own server (`dash.kurohiko.id`). It is not sold or shared with anyone. The code that sends it is open in [`electron/stats.js`](electron/stats.js) and [`electron/kuro-stats.cjs`](electron/kuro-stats.cjs). If you'd rather send nothing, block `dash.kurohiko.id` in your firewall or hosts file. Waku keeps working normally.
+
 ## Data and uninstall
 
 Settings, layouts, presets, and uploaded images are stored in `%APPDATA%\Waku`. Uninstall from Windows **Settings → Apps**. The data folder is kept, so delete it manually for a clean removal.

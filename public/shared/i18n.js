@@ -11,7 +11,7 @@ const EN = {
   'tab lain aktif': 'another tab is active', 'diambil alih tab lain': 'taken over by another tab', 'klik untuk ambil alih': 'click to take over',
   'Salin link preview': 'Copy preview link', 'Tersalin': 'Copied', 'Gagal menyalin, salin manual': 'Copy failed, copy it manually',
   'Koneksi halaman ini ke server lokal. Kalau terputus, perubahan tidak sampai ke OBS dan tidak tersimpan.': 'This page’s connection to the local server. If it drops, changes don’t reach OBS and aren’t saved.',
-  'Capture jendela Discord. Kalau mati, OBS tidak menerima video.': 'Capture of the Discord window. When off, OBS receives no video.',
+  'Capture jendela Discord. Kalau mati, OBS tidak menerima video. Klik untuk menghentikan atau memulai.': 'Capture of the Discord window. When off, OBS receives no video. Click to stop or start it.',
   'Status bicara langsung dari aplikasi Discord di PC ini.': 'Speaking status straight from the Discord app on this PC.',
   'Deteksi bicara untuk semua frame. Klik untuk menyalakan atau mematikan.': 'Speaking detection for all frames. Click to turn on or off.',
   'Jeda pratinjau': 'Pause preview', 'Lanjutkan pratinjau': 'Resume preview',
@@ -48,6 +48,8 @@ const EN = {
   'Kunci resize tile': 'Lock tile resize', 'Aktif': 'Enabled', 'aktif': 'on',
   'Gaya frame (timpa umum)': 'Frame style (overrides general)', 'Kembalikan semua ke umum': 'Reset all to general',
   'Deteksi bicara (Discord dan kotak hijau)': 'Speaking detection (Discord and green box)', 'Animasi saat bicara': 'Speaking animation',
+  'Animasi pindah preset': 'Preset switch animation', 'Frame bergeser halus di OBS saat preset, Temp, atau template otomatis diterapkan': 'Frames glide smoothly in OBS when a preset, Temp entry, or auto template is applied',
+  'Cepat': 'Fast', 'Normal': 'Normal', 'Pelan': 'Slow',
   'Ambang hijau': 'Green threshold', 'Ambang': 'Threshold',
 
   // tab Preset
@@ -116,7 +118,7 @@ const EN = {
 
   // capture
   'menyiapkan...': 'preparing...', 'Pilih jendela Discord...': 'Choose the Discord window...', 'Menyiapkan capture...': 'Preparing capture...',
-  'Capture dibatalkan': 'Capture canceled', 'Ukuran jendela Discord berubah. Kembalikan ukurannya, atau atur ulang crop.': 'The Discord window size changed. Restore its size, or set the crops again.', 'Capture berhenti, klik Capture lagi': 'Capture stopped, click Capture again', 'Capture aktif': 'Capture active',
+  'Capture dibatalkan': 'Capture canceled', 'Ukuran jendela Discord berubah. Kembalikan ukurannya, atau atur ulang crop.': 'The Discord window size changed. Restore its size, or set the crops again.', 'Capture berhenti, klik Capture lagi': 'Capture stopped, click Capture again', 'Capture aktif': 'Capture active', 'Capture dihentikan': 'Capture stopped',
 
   // bantuan
   'Persiapan sebelum live': 'Before going live', 'Di Discord': 'In Discord', 'Matikan': 'Turn off',

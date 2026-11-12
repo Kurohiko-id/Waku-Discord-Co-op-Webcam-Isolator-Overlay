@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('wakuApp', {
   shortcuts: () => ipcRenderer.invoke('app:shortcuts'), // { list, failed }
   setShortcuts: keys => ipcRenderer.invoke('app:setShortcuts', keys),
   pauseShortcuts: paused => ipcRenderer.invoke('app:shortcutsPause', paused),
+  setCapturing: on => ipcRenderer.send('app:capturing', on),
   onCommand: fn => ipcRenderer.on('app:cmd', (_e, cmd) => fn(cmd)), // shortcut global / Stream Deck
   bugReport: () => ipcRenderer.invoke('app:bugReport'), // menyalin ke clipboard, juga mengembalikan teksnya
   update: action => ipcRenderer.invoke('app:update', action), // 'state' | 'check' | 'download' | 'install'

@@ -39,6 +39,21 @@ function readLayout(file, onBad) {
   return emptyLayout();
 }
 
+// Statistik anonim: fitur apa saja yang dipakai layout ini (hanya nama fitur, tanpa nama/akun/isi layout).
+export function featureList(l) {
+  const act = l.slots.filter(s => s.enabled), n = act.length, on = l.settings.detectEnabled;
+  const f = [n <= 2 ? 'f_frames_1-2' : n <= 4 ? 'f_frames_3-4' : n <= 6 ? 'f_frames_5-6' : 'f_frames_7plus'];
+  if (!on) f.push('f_detect_off');
+  if (on && act.some(s => s.discordId)) f.push('f_official');
+  if (on && act.some(s => s.detect && !s.discordId && !s.image)) f.push('f_manual');
+  if (act.some(s => s.image)) f.push('f_virtual');
+  if (l.settings.transitionMs === 0) f.push('f_transition_off');
+  if (l.style?.label?.show) f.push('f_label');
+  if (l.guides?.x?.length || l.guides?.y?.length) f.push('f_guides');
+  for (const e of l.style?.speak?.effects ?? []) if (/^[a-z]{1,20}$/.test(e)) f.push('f_fx_' + e);
+  return f;
+}
+
 // Preview tidak memakai preset dan garis bantu; jangan kirim ulang semuanya tiap drag.
 const forPreview = ({ presets: _p, temp: _t, guides: _g, library: _l, ...rest }) => rest;
 
@@ -57,6 +72,7 @@ export function createServer({
   discordPipes, // hanya untuk tes; bawaan = pipe Discord sungguhan
   secretKey = null, // base64 32 byte dari aplikasi Electron (safeStorage); null = berkas JSON biasa
   uploadDir = path.join(root, 'uploads'),
+  onFeatures = null, // Electron: daftar fitur dikirim ke proses utama untuk statistik anonim
 } = {}) {
   const clients = new Map(); // ws -> 'control' | 'preview'
   const speakingNow = new Set(); // slotId yang sedang bicara: dikirim ulang ke preview yang baru connect/refresh
@@ -116,7 +132,14 @@ export function createServer({
     }
     if (saveNotice !== was) sendTo('control', notice());
   };
-  const persist = () => { clearTimeout(persistTimer); persistTimer = setTimeout(writeNow, persistDelayMs); };
+  let deckSeen = false, lastFeat = '';
+  const reportFeatures = (extra = []) => {
+    if (!onFeatures) return;
+    const list = [...featureList(layout), ...(deckSeen ? ['f_streamdeck'] : []), ...extra], k = list.join();
+    if (k !== lastFeat) { lastFeat = k; onFeatures(list); }
+  };
+  reportFeatures();
+  const persist = () => { clearTimeout(persistTimer); persistTimer = setTimeout(() => { writeNow(); reportFeatures(); }, persistDelayMs); };
 
   // Browser selalu mengirim Origin pada WebSocket; hanya halaman kita sendiri yang boleh.
   const originOk = origin => {
@@ -334,6 +357,7 @@ export function createServer({
       clients.set(ws, role);
       writeLog('server', 'conn_open', { role });
       sendWs(ws, deckMsg());
+      deckSeen = true; reportFeatures();
       ws.on('close', () => { clients.delete(ws); writeLog('server', 'conn_close', { role }); });
       ws.on('message', raw => {
         let msg;
@@ -400,7 +424,8 @@ export function createServer({
         if (!v) { writeLog('server', 'layout_rejected', {}); return; }
         layout = v;
         persist();
-        sendTo('preview', { type: 'layout', layout: forPreview(layout) });
+        if (msg.transition === true) reportFeatures(['f_preset_switch']);
+        sendTo('preview', { type: 'layout', layout: forPreview(layout), transition: msg.transition === true }); // true = pindah preset, dianimasikan
       } else if (msg.type === 'speaking' && role === 'control') {
         if (typeof msg.slotId === 'string' && typeof msg.speaking === 'boolean') {
           if (msg.speaking) speakingNow.add(msg.slotId); else speakingNow.delete(msg.slotId);
@@ -480,6 +505,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url) || process.parentPort) {
     discordFile: path.join(data, 'discord.json'),
     tokenFile: path.join(data, 'discord-token.json'),
     secretKey,
+    onFeatures: list => process.parentPort?.postMessage({ type: 'features', list }),
   });
   // Jaring pengaman: satu bug di handler tidak boleh mematikan overlay saat live.
   process.on('uncaughtException', e => { console.error(e); srv.log('server', 'uncaught', { msg: String(e?.stack ?? e).slice(0, 500) }); });

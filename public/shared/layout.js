@@ -3,6 +3,7 @@ import { clampRect, ratioHeight } from './geometry.js';
 
 const MAX_SLOTS = 16;
 export const FPS_CHOICES = [15, 24, 30, 60];
+export const TRANSITION_CHOICES = [0, 250, 400, 700]; // durasi animasi pindah preset di OBS (ms); 0 = mati
 const DEFAULT_GREEN_MIN = 0.02; // outline Discord yang asli tipis: hanya ~3% kotak deteksi yang hijau
 const num = v => Number.isFinite(v);
 // ukuran frame capture (px) tempat crop dibuat; 0 = belum diketahui (layout lama)
@@ -191,6 +192,7 @@ export function validateLayout(l) {
       // video ke OBS: bitrate maksimum encoder (Mbps) dan frame per detik capture
       bitrate: num(l.settings?.bitrate) ? Math.min(20, Math.max(2, Math.round(l.settings.bitrate))) : 8,
       fps: FPS_CHOICES.includes(l.settings?.fps) ? l.settings.fps : 30,
+      transitionMs: TRANSITION_CHOICES.includes(l.settings?.transitionMs) ? l.settings.transitionMs : 400,
       frameW: frameSize(l.settings?.frameW), frameH: frameSize(l.settings?.frameH), // ukuran capture tempat crop dibuat
     },
     style: validateStyle(l.style),

@@ -615,3 +615,14 @@ label:has(> input[type=checkbox]) { justify-content: flex-start; }
 .arrange .sep { width: 1px; height: 18px; margin: 0 6px; background: var(--line-2); }
 .ar-gap { display: flex; align-items: center; gap: 6px; margin: 0 4px 0 8px; font-size: 12px; color: var(--ink3); }
 .ar-gap input { width: 58px; height: 28px; }
+
+/* template otomatis sebagai gambar susunan */
+.kinds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 4px 0 8px; }
+.kind { padding: 3px; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--top); cursor: pointer; }
+.kind:hover { border-color: var(--ink3); }
+.kind[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.kind svg { display: block; width: 100%; height: auto; }
+.kind .c { fill: var(--surface-2); }
+.kind .t { fill: var(--ink3); }
+.kind .v { fill: var(--accent-soft); }
+.kind:hover .t, .kind[aria-pressed="true"] .t { fill: var(--accent); }

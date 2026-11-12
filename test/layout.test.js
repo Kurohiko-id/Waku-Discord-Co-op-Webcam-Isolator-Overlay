@@ -40,7 +40,7 @@ test('newSlotFrom menyalin ukuran crop dan tile, posisi mengikuti grid', () => {
 test('layout kosong valid dengan settings default', () => {
   assert.deepEqual(validateLayout({ slots: [] }), {
     slots: [],
-    settings: { animate: true, greenMin: 0.02, detectEnabled: true, bitrate: 8, fps: 30, frameW: 0, frameH: 0 },
+    settings: { animate: true, greenMin: 0.02, detectEnabled: true, bitrate: 8, fps: 30, transitionMs: 400, frameW: 0, frameH: 0 },
     style: defaultStyle(),
     template: 'sticker-night',
     guides: { x: [], y: [] },
@@ -160,7 +160,7 @@ test('menormalkan nama, boolean, dan greenMin', () => {
   assert.equal(l.slots[0].name.length, 40);
   assert.equal(l.slots[0].cropLocked, true);
   assert.equal(l.slots[0].enabled, true);
-  assert.deepEqual(l.settings, { animate: false, greenMin: 1, detectEnabled: true, bitrate: 8, fps: 30, frameW: 0, frameH: 0 });
+  assert.deepEqual(l.settings, { animate: false, greenMin: 1, detectEnabled: true, bitrate: 8, fps: 30, transitionMs: 400, frameW: 0, frameH: 0 });
   assert.equal(validateLayout({ slots: [], settings: { greenMin: 'abc' } }).settings.greenMin, 0.02);
   assert.equal(validateLayout({ slots: [], settings: { greenMin: 0 } }).settings.greenMin, 0.005);
   assert.equal(validateLayout({ slots: [], settings: { greenMin: 0.03 } }).settings.greenMin, 0.03);

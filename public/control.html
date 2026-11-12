@@ -21,7 +21,7 @@
       <span id="copyNote" role="status" aria-live="polite"></span>
   </div>
   <span class="pill" title="Koneksi halaman ini ke server lokal. Kalau terputus, perubahan tidak sampai ke OBS dan tidak tersimpan."><i class="dot"></i>Server <b id="wsState" class="off">...</b></span>
-  <span class="pill" id="capChip" title="Capture jendela Discord. Kalau mati, OBS tidak menerima video."><i class="dot"></i>Capture <b id="capState" class="off">mati</b></span>
+  <button type="button" class="pill" id="capChip" title="Capture jendela Discord. Kalau mati, OBS tidak menerima video. Klik untuk menghentikan atau memulai."><i class="dot"></i>Capture <b id="capState" class="off">mati</b></button>
   <button type="button" class="pill" id="dcChip" hidden title="Status bicara langsung dari aplikasi Discord di PC ini."><i class="dot"></i>Discord <b id="dcState" class="off">...</b></button>
   <button type="button" class="pill" id="updChip" hidden title="Ada versi baru Waku. Klik untuk melihat."><i class="dot"></i>Update <b id="updState" class="wait"></b></button>
   <button type="button" class="pill" id="detChip" title="Deteksi bicara untuk semua frame. Klik untuk menyalakan atau mematikan."><i class="dot"></i>Deteksi <b id="detState" class="off">mati</b></button>
@@ -77,9 +77,13 @@
       </div>
 
       <div class="tabpanel" id="panelPreset" role="tabpanel" hidden>
+        <div class="box">
+          <label class="sf-row"><span title="Frame bergeser halus di OBS saat preset, Temp, atau template otomatis diterapkan">Animasi pindah preset</span><select id="pTransition"><option value="0">Mati</option><option value="250">Cepat</option><option value="400">Normal</option><option value="700">Pelan</option></select></label>
+        </div>
         <div class="box" id="autoBox">
           <h3>Template otomatis</h3>
-          <label class="sf-row"><span>Susunan</span><select id="aKind" title="Menata ulang posisi dan ukuran semua tile aktif. Crop tidak berubah."><option value="">Pilih susunan...</option><option value="grid">Grid rata</option><option value="row">Satu baris (kiri ke kanan)</option><option value="column">Satu kolom (atas ke bawah)</option><option value="main-right">Satu besar, sisanya di kanan</option><option value="main-bottom">Satu besar, sisanya di bawah</option><option value="bottom">Rata bawah (satu baris)</option><option value="top">Rata atas (satu baris)</option><option value="sides">Kiri-kanan (setengah-setengah)</option></select></label>
+          <div class="kinds" id="aKinds" role="group" aria-label="Susunan"></div>
+          <label class="sf-row" hidden><span>Susunan</span><select id="aKind" title="Menata ulang posisi dan ukuran semua tile aktif. Crop tidak berubah."><option value="">Pilih susunan...</option><option value="grid">Grid rata</option><option value="row">Satu baris (kiri ke kanan)</option><option value="column">Satu kolom (atas ke bawah)</option><option value="main-right">Satu besar, sisanya di kanan</option><option value="main-bottom">Satu besar, sisanya di bawah</option><option value="bottom">Rata bawah (satu baris)</option><option value="top">Rata atas (satu baris)</option><option value="sides">Kiri-kanan (setengah-setengah)</option></select></label>
           <label class="sf-row"><span>Jarak <b id="aGapVal">32</b> px</span><input type="range" id="aGap" min="0" max="100" step="1" value="32"></label>
           <button id="aUndo" class="btn small" type="button" disabled>Urungkan template</button>
         </div>
@@ -197,7 +201,8 @@
 
 <div id="quickCfg" popover>
   <h3>Susunan</h3>
-  <label class="sf-row"><span>Template</span><select id="qKind"></select></label>
+  <div class="kinds" id="qKinds" role="group" aria-label="Template"></div>
+  <label class="sf-row" hidden><span>Template</span><select id="qKind"></select></label>
   <h3>Video ke OBS</h3>
   <label class="sf-row"><span>Bitrate <b id="qBitrateVal"></b> Mbps</span><input type="range" id="qBitrate" min="2" max="20" step="1"></label>
   <label class="sf-row"><span>FPS</span><select id="qFps"></select></label>

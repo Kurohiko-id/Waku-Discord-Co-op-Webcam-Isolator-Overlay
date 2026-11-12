@@ -93,6 +93,26 @@ Klik **Pasang plugin Stream Deck** untuk memasang plugin-nya, atau pakai aksi **
 
 Untuk melaporkan bug, buka tab **Atur → Laporan bug**, klik **Salin info**, lalu tempel di [Issues](https://github.com/Kurohiko-id/Waku-Discord-Co-op-Webcam-Isolator-Overlay/issues). Laporan ini tidak berisi token atau secret Discord.
 
+## Privasi
+
+Halo, aku Kurohiko, VTuber sekaligus developer Waku. Aku sangat menghargai privasi kalian.
+
+Supaya Waku bisa terus berkembang ke arah yang tepat, aku butuh beberapa data dasar: berapa orang yang menginstal Waku, fitur apa saja yang dipakai, dan sistem operasi apa yang kalian gunakan. Dari situ aku bisa melihat fitur mana yang sering dipakai dan layak ditingkatkan, dan fitur mana yang ternyata jarang dipakai.
+
+Semua data ini **sepenuhnya anonim**. Aku tidak tahu siapa yang menginstal Waku, dan tidak tahu siapa yang memakai fitur apa.
+
+**Yang dikirim:**
+
+- ID acak yang dibuat saat Waku pertama kali dibuka. ID ini tidak terhubung ke akun, nama, atau perangkat kalian.
+- Versi Waku, versi Windows, dan bahasa sistem.
+- Negara, diperkirakan dari koneksi. Alamat IP tidak disimpan.
+- Nama fitur yang aktif, misalnya mode bicara Official/Manual, frame gambar, jumlah frame, efek, dan Stream Deck. Tiap fitur dihitung paling banyak sekali sehari, jadi tidak ada catatan per klik.
+- Pesan error kalau Waku mengalami masalah. Nama folder pengguna di dalamnya disamarkan.
+
+**Yang tidak pernah dikirim:** akun dan token Discord, nama teman, nama frame, isi layout dan preset, gambar unggahan, tangkapan layar, dan video.
+
+Data dikirim ke server milikku sendiri (`dash.kurohiko.id`), tidak dijual, dan tidak dibagikan ke pihak lain. Kode pengirimnya terbuka di [`electron/stats.js`](electron/stats.js) dan [`electron/kuro-stats.cjs`](electron/kuro-stats.cjs). Kalau tetap tidak ingin mengirim apa pun, blokir `dash.kurohiko.id` di firewall atau file hosts. Waku tetap berjalan normal.
+
 ## Data dan uninstall
 
 Pengaturan, layout, preset, dan gambar unggahan disimpan di `%APPDATA%\Waku`. Uninstall lewat **Settings → Apps** di Windows. Folder data tidak ikut terhapus, jadi hapus manual kalau ingin bersih total.

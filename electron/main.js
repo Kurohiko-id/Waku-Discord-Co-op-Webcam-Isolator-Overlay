@@ -1,6 +1,6 @@
 // Proses utama Electron: menjalankan server Waku di utilityProcess (data di userData) dan membuka /control.
 // `electron . --encoder-check` hanya mengecek encoder video (H264/hardware) lalu keluar.
-import { app, BrowserWindow, utilityProcess, shell, session, desktopCapturer, dialog, ipcMain, Tray, Menu, nativeImage, clipboard, safeStorage, crashReporter, globalShortcut, screen } from 'electron';
+import { app, BrowserWindow, utilityProcess, shell, session, desktopCapturer, dialog, ipcMain, Tray, Menu, clipboard, safeStorage, crashReporter, globalShortcut, screen } from 'electron';
 import fs from 'node:fs';
 import net from 'node:net';
 import crypto from 'node:crypto';
@@ -11,6 +11,7 @@ import { createShortcuts } from './shortcuts.js';
 import { bugReport } from './bug-report.js';
 import { createUpdater } from './updater.js';
 import { centerIn } from './placement.js';
+import { createStats } from './stats.js';
 import updaterPkg from 'electron-updater';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -48,10 +49,10 @@ function migrate(data) {
   }
 }
 
-let win = null, server = null, quitting = false, tray = null, origin = '';
+let win = null, server = null, quitting = false, tray = null, origin = '', stats = null;
 // Bandingkan origin utuh: startsWith('http://localhost:1500') juga lolos untuk localhost:15000 atau localhost:1500.evil.com.
 const isOwn = url => { try { return new URL(url).origin === origin; } catch { return false; } };
-const ICON = path.join(root, 'build', 'icon.png');
+const ICON = path.join(root, 'build', 'icon.ico'); // .ico berisi 16-256 px: Windows tidak mengecilkan sendiri (hasilnya bergerigi)
 // Bahasa aplikasi (tombol ID/EN di kontrol) disimpan di settings.json. Belum dipilih: bahasa yang dipilih
 // di installer (berkas install-lang di folder aplikasi, ditulis build/installer.nsh), lalu bahasa Windows.
 const sysLang = () => (app.getPreferredSystemLanguages()[0] ?? '').toLowerCase().startsWith('id') ? 'id' : 'en';
@@ -66,13 +67,12 @@ const showWin = () => { if (!win) { if (port) createWindow(port); return; } if (
 
 // Close = sembunyi ke tray: capture, deteksi bicara, dan video ke OBS tetap jalan. Keluar lewat menu tray.
 const TRAY_T = {
-  id: { open: 'Buka Waku', copy: 'Salin link OBS', quit: 'Keluar', hidden: 'Waku masih berjalan di sini. Capture dan video ke OBS tetap jalan; keluar lewat menu ikon ini.' },
-  en: { open: 'Open Waku', copy: 'Copy OBS link', quit: 'Quit', hidden: 'Waku is still running here. Capture and video to OBS keep going; quit from this icon’s menu.' },
+  id: { open: 'Buka Waku', copy: 'Salin link OBS', stop: 'Hentikan capture', quit: 'Keluar', hidden: 'Waku masih berjalan di sini. Capture dan video ke OBS tetap jalan; keluar lewat menu ikon ini.' },
+  en: { open: 'Open Waku', copy: 'Copy OBS link', stop: 'Stop capture', quit: 'Quit', hidden: 'Waku is still running here. Capture and video to OBS keep going; quit from this icon’s menu.' },
 };
-let hintShown = false;
+let hintShown = false, capturing = false; // capturing: dilaporkan halaman kontrol
 function createTray() {
-  const img = nativeImage.createFromPath(ICON);
-  tray = new Tray(img.resize({ width: 32, height: 32 }));
+  tray = new Tray(ICON);
   tray.setToolTip('Waku');
   tray.on('click', showWin);
   tray.on('right-click', async () => {
@@ -80,6 +80,7 @@ function createTray() {
     tray.popUpContextMenu(Menu.buildFromTemplate([
       { label: t.open, click: showWin },
       { label: t.copy, click: () => clipboard.writeText(origin + '/preview') },
+      ...(capturing && win ? [{ label: t.stop, click: () => win?.webContents.send('app:cmd', { type: 'capture' }) }] : []),
       { type: 'separator' },
       { label: t.quit, click: () => app.quit() },
     ]));
@@ -133,6 +134,7 @@ function startServer(onReady) {
   child.on('message', m => {
     if (m?.type === 'ready') onReady(m.port);
     else if (m?.type === 'error') { expectExit = true; onStartError(m.code, onReady); }
+    else if (m?.type === 'features' && Array.isArray(m.list)) stats?.features([...m.list, ...(readSettings().shortcuts?.length ? ['f_shortcuts'] : [])]);
   });
   // Server mati tak terduga: hidupkan lagi; halaman kontrol menyambung ulang sendiri.
   child.on('exit', code => {
@@ -188,6 +190,7 @@ const fromMain = e => !!win && e.sender === win.webContents;
 ipcMain.handle('app:info', e => (fromMain(e) ? { port, defaultPort: DEFAULT_PORT } : null));
 // sinkron: i18n di halaman butuh bahasa sebelum menerjemahkan apa pun
 ipcMain.on('app:getLang', e => { e.returnValue = fromMain(e) ? appLang() : null; });
+ipcMain.on('app:capturing', (e, on) => { if (fromMain(e)) capturing = !!on; });
 ipcMain.on('app:setLang', (e, l) => { if (fromMain(e) && (l === 'id' || l === 'en')) saveSettings({ lang: l }); });
 ipcMain.handle('app:openLogs', e => (fromMain(e) ? shell.openPath(logDir()) : null));
 // Plugin Stream Deck: file .streamDeckPlugin ikut di installer (extraResources); membukanya = aplikasi Stream Deck memasangnya.
@@ -259,7 +262,7 @@ function createWindow(port) {
     return { action: 'deny' };
   });
   win.webContents.on('will-navigate', (e, url) => { if (!isOwn(url)) e.preventDefault(); });
-  win.on('closed', () => { win = null; });
+  win.on('closed', () => { win = null; capturing = false; });
   win.loadURL(origin + '/control');
 }
 
@@ -333,8 +336,8 @@ function captureHandler() {
 
 // Crash lokal saja: minidump di folder Crashpad (userData), tidak pernah dikirim ke mana pun.
 if (!CHECK) crashReporter.start({ uploadToServer: false });
-process.on('uncaughtException', e => { console.error(e); mainLog('uncaught', { msg: errMsg(e) }); });
-process.on('unhandledRejection', e => { console.error(e); mainLog('unhandled_rejection', { msg: errMsg(e) }); });
+process.on('uncaughtException', e => { console.error(e); mainLog('uncaught', { msg: errMsg(e) }); stats?.error(e); });
+process.on('unhandledRejection', e => { console.error(e); mainLog('unhandled_rejection', { msg: errMsg(e) }); stats?.error(e); });
 app.on('render-process-gone', (_e, _wc, d) => mainLog('render_gone', { reason: d.reason, code: d.exitCode }));
 app.on('child-process-gone', (_e, d) => { if (d.reason !== 'clean-exit') mainLog('child_gone', { type: d.type, reason: d.reason, code: d.exitCode, name: d.name }); });
 
@@ -343,6 +346,8 @@ app.whenReady().then(() => {
   mainLog('app_start', { version: app.getVersion(), electron: process.versions.electron });
   const data = app.getPath('userData');
   migrate(data);
+  stats = createStats({ version: app.getVersion(), dir: data, enabled: app.isPackaged });
+  stats.start();
   captureHandler();
   startServer(p => { if (!port) { port = p; createWindow(p); createTray(); shortcuts.register(); setTimeout(() => updates.check(), 8000); } });
 });
