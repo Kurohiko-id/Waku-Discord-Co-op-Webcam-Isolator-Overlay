@@ -8,6 +8,7 @@ import { validateLayout } from './public/shared/layout.js';
 import { defaultPresets } from './public/shared/default-presets.js';
 import { createDiscord } from './discord.js';
 import { jsonFile, encryptedFile } from './secret-store.js';
+import { cleanAction } from './electron/shortcuts.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const pub = path.join(root, 'public');
@@ -236,16 +237,10 @@ export function createServer({
   const cleanDeckState = s => ({
     presets: (Array.isArray(s?.presets) ? s.presets : []).slice(0, 50).map(p => ({ id: str(p?.id), name: str(p?.name, 80) })),
     templates: (Array.isArray(s?.templates) ? s.templates : []).slice(0, 20).map(t => ({ key: str(t?.key), name: str(t?.name, 80) })),
+    layouts: (Array.isArray(s?.layouts) ? s.layouts : []).slice(0, 20).map(t => ({ key: str(t?.key), name: str(t?.name, 80), short: str(t?.short, 24) })),
     template: str(s?.template),
     detect: !!s?.detect,
   });
-  const ID = /^[\w-]{1,64}$/;
-  const cleanDeckAction = a => {
-    if (a?.type === 'preset' && ID.test(a.id)) return { type: 'preset', id: a.id };
-    if (a?.type === 'template') return ID.test(a.key) ? { type: 'template', key: a.key } : { type: 'template' };
-    if (a?.type === 'detect') return ['on', 'off'].includes(a.set) ? { type: 'detect', set: a.set } : { type: 'detect' };
-    return null;
-  };
   // Signaling WebRTC hanya untuk koneksi terbaru per role (satu peer connection aktif).
   const latest = role => {
     let last;
@@ -362,7 +357,7 @@ export function createServer({
       ws.on('message', raw => {
         let msg;
         try { msg = JSON.parse(raw); } catch { return; }
-        const a = msg?.type === 'cmd' ? cleanDeckAction(msg.action) : null;
+        const a = msg?.type === 'cmd' ? cleanAction(msg.action) : null;
         if (!a) return;
         writeLog('server', 'deck_cmd', a);
         const c = latest('control');

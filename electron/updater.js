@@ -16,6 +16,7 @@ export function createUpdater({ updater, packaged, send, log = () => {}, store =
   let state = { status: packaged ? 'idle' : 'dev' };
   let manual = false, lastErr = null;
   const set = s => { state = s; send(state); };
+  const keepNotes = s => set({ ...s, ...(state.notes && { notes: state.notes }) }); // catatan rilis ikut sampai terpasang
   // electron-updater melaporkan error yang sama lewat event 'error' dan lewat promise yang ditolak: proses sekali saja
   const fail = e => {
     if (e && e === lastErr) return;
@@ -44,8 +45,8 @@ export function createUpdater({ updater, packaged, send, log = () => {}, store =
       set(s);
     });
     updater.on('update-not-available', () => set({ status: 'none' }));
-    updater.on('download-progress', p => set({ status: 'downloading', version: state.version, ...(state.notes && { notes: state.notes }), percent: Math.floor(p?.percent ?? 0) }));
-    updater.on('update-downloaded', info => { log('update_ready', { version: info?.version }); set({ status: 'ready', version: info?.version ?? state.version, ...(state.notes && { notes: state.notes }) }); });
+    updater.on('download-progress', p => keepNotes({ status: 'downloading', version: state.version, percent: Math.floor(p?.percent ?? 0) }));
+    updater.on('update-downloaded', info => { log('update_ready', { version: info?.version }); keepNotes({ status: 'ready', version: info?.version ?? state.version }); });
     updater.on('error', fail);
   }
 
@@ -72,7 +73,7 @@ export function createUpdater({ updater, packaged, send, log = () => {}, store =
     },
     download() {
       if (state.status !== 'available') return state;
-      set({ status: 'downloading', version: state.version, ...(state.notes && { notes: state.notes }), percent: 0 });
+      keepNotes({ status: 'downloading', version: state.version, percent: 0 });
       updater.downloadUpdate().catch(fail);
       return state;
     },

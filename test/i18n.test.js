@@ -48,7 +48,7 @@ function jsTexts(src) {
 test('semua teks UI halaman kontrol punya terjemahan EN', () => {
   const texts = [
     ...htmlTexts(read('control.html')),
-    ...['control.js', 'crop-dialog.js', 'virtual-dialog.js', 'style-form.js', 'preset-io-dialog.js'].flatMap(f => jsTexts(read(f))),
+    ...['control.js', 'crop-dialog.js', 'virtual-dialog.js', 'style-form.js', 'preset-io-dialog.js', 'update-dialog.js'].flatMap(f => jsTexts(read(f))),
   ];
   const missing = [...new Set(texts.filter(needsText).filter(s => !translates(s)))];
   assert.deepEqual(missing, [], 'Tambahkan entri di EN atau PATTERNS (public/shared/i18n.js):\n' + missing.join('\n'));

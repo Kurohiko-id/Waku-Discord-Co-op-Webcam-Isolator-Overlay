@@ -453,15 +453,18 @@ test('plugin Stream Deck (role deck): status dari control diteruskan, perintah d
 
   const c = await open(port, 'control');
   await next(c, isLayout);
-  c.send(JSON.stringify({ type: 'deck_state', state: { presets: [{ id: 'p1', name: 'Main', slots: [1, 2] }], templates: [{ key: 'neon', name: 'Neon' }], template: 'neon', detect: 1, extra: 'x' } }));
+  c.send(JSON.stringify({ type: 'deck_state', state: { presets: [{ id: 'p1', name: 'Main', slots: [1, 2] }], templates: [{ key: 'neon', name: 'Neon' }], layouts: [{ key: 'left', name: 'Rata kiri (satu kolom)', short: 'Rata kiri' }], template: 'neon', detect: 1, extra: 'x' } }));
   const s = await next(d, m => m.type === 'state' && m.control);
-  assert.deepEqual(s.state, { presets: [{ id: 'p1', name: 'Main' }], templates: [{ key: 'neon', name: 'Neon' }], template: 'neon', detect: true });
+  assert.deepEqual(s.state, { presets: [{ id: 'p1', name: 'Main' }], templates: [{ key: 'neon', name: 'Neon' }], layouts: [{ key: 'left', name: 'Rata kiri (satu kolom)', short: 'Rata kiri' }], template: 'neon', detect: true });
 
   d.send(JSON.stringify({ type: 'cmd', action: { type: 'preset', id: 'p1', evil: 1 } }));
   d.send(JSON.stringify({ type: 'cmd', action: { type: 'preset', id: '../x' } })); // id tidak valid: dibuang
   d.send(JSON.stringify({ type: 'layout', layout: { slots: [] } })); // deck tidak boleh mengubah layout
+  d.send(JSON.stringify({ type: 'cmd', action: { type: 'layout', kind: 'bad kind!' } })); // jenis tidak valid: dibuang
+  d.send(JSON.stringify({ type: 'cmd', action: { type: 'layout', kind: 'left', evil: 1 } }));
   d.send(JSON.stringify({ type: 'cmd', action: { type: 'detect', set: 'off' } }));
   assert.deepEqual((await next(c, m => m.type === 'cmd')).action, { type: 'preset', id: 'p1' });
+  assert.deepEqual((await next(c, m => m.type === 'cmd')).action, { type: 'layout', kind: 'left' });
   assert.deepEqual((await next(c, m => m.type === 'cmd')).action, { type: 'detect', set: 'off' });
   assert.equal(c.q.filter(m => m.type === 'cmd' || m.type === 'layout').length, 0);
 

@@ -1,3 +1,5 @@
+import { overlaps } from './geometry.js';
+
 // Pasangan frame lama -> baru untuk animasi pindah preset. Urutan: akun Discord sama, id slot sama, nama sama,
 // lalu sisanya ke frame terdekat (pasangan paling dekat dikunci dulu supaya lintasan tidak saling silang).
 // Kamera hanya dipasangkan dengan kamera, frame gambar dengan frame gambar.
@@ -24,3 +26,7 @@ export function matchSlots(A, B) {
   A.forEach((a, i) => { if (!ua.has(i)) pairs.push({ a, b: null, kind: 'keluar' }); });
   return pairs;
 }
+
+// Isi tile tetap sama setelah pindah (kamera di tempat yang sama, atau gambar yang sama)? Kalau tidak, tile lama
+// tidak boleh dipakai ulang: isinya akan langsung berganti lalu baru bergeser. Crossfade sambil bergerak.
+export const sameView = (a, b) => (a.image || b.image ? a.image === b.image : overlaps(a.crop, b.crop));

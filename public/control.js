@@ -1,6 +1,6 @@
 import { connect } from '/shared/ws.js';
-import { newSlot, newSlotFrom, nextSlotName, presetOrder, mergeDraft, presetSlots, applyPresetSlots, virtualLibrary, rememberVirtual, forgetVirtual, withVirtualSources, rescaleSlots, MAX_PRESETS, MAX_TEMP } from '/shared/layout.js';
-import { snapRect, snapSpacing, alignedLines, ratioHeight, clampRect, resizeCorner, cropFromTile } from '/shared/geometry.js';
+import { newSlot, newSlotFrom, nextSlotName, presetOrder, mergeDraft, presetSlots, shownSlots, applyPresetSlots, virtualLibrary, rememberVirtual, forgetVirtual, withVirtualSources, rescaleSlots, MAX_PRESETS, MAX_TEMP } from '/shared/layout.js';
+import { snapRect, snapSpacing, alignedLines, ratioHeight, clampRect, resizeCorner, cropFromTile, overlaps } from '/shared/geometry.js';
 import { attachDrag } from '/shared/drag.js';
 import { place, showGuides, showMatch, showGaps, addCorners } from '/editor-dom.js';
 import { createCropDialog } from '/crop-dialog.js';
@@ -15,7 +15,8 @@ import { buildTile, updateTile } from '/shared/tile-dom.js';
 import { Stat, createLogger, watchIce } from '/shared/log.js';
 import { iceDone } from '/shared/rtc.js';
 import { createPresetIoDialogs } from '/preset-io-dialog.js';
-import { startI18n, setLang, getLang, original } from '/shared/i18n.js';
+import { initUpdates } from '/update-dialog.js';
+import { startI18n, setLang, getLang, original, tr } from '/shared/i18n.js';
 
 const $ = id => document.getElementById(id);
 const video = $('src');
@@ -83,7 +84,7 @@ $('copyUrl').onclick = async () => {
 };
 
 function onMsg(msg) {
-  if (msg.type === 'layout') { layout = msg.layout; layout.guides ??= { x: [], y: [] }; layout.presets ??= []; layout.temp ??= []; layout.library ??= []; savedJson = JSON.stringify(layout); render(); } // titik awal riwayat
+  if (msg.type === 'layout') { layout = msg.layout; layout.guides ??= { x: [], y: [] }; layout.presets ??= []; layout.temp ??= []; layout.library ??= []; savedJson = JSON.stringify(layout); render(); reclamp(); } // titik awal riwayat
   else if (msg.type === 'ready') { previewVisible = true; noPreview = false; offer(); } // preview (baru) melapor sendiri bila tersembunyi
   else if (msg.type === 'no_preview') noPreview = true; // OBS belum/tidak terbuka: offer menunggu 'ready', tidak diulang tiap 10 detik
   else if (msg.type === 'visible') setPreviewVisible(msg.on);
@@ -177,7 +178,7 @@ function fillSlotStyle() {
 }
 // ---- aksi massal: slider langsung berlaku; selalu dihitung dari kondisi sebelum sesi, jadi bisa diurungkan ----
 const bulk = { snapshot: null, width: false, ratio: null, grid: false, auto: null, preset: false }; // auto = { kind, gap }; preset = snapshot milik Urungkan preset
-let bulkTimer;
+let bulkTimer, bulkAnim = false;
 function resetBulk() {
   bulk.snapshot = null; bulk.width = false; bulk.ratio = null; bulk.grid = false; bulk.auto = null; bulk.preset = false;
   $('aKind').value = '';
@@ -186,6 +187,8 @@ function resetBulk() {
 }
 // Template otomatis sebagai gambar: tiap tombol menggambar hasil autoLayout untuk frame aktif sekarang
 // (jumlah, urutan, rasio crop, jarak), jadi terlihat tanpa membaca. Dropdown aslinya tetap jadi sumber nilai.
+// Pilih template otomatis (gambar di panel, shortcut, Stream Deck): lewat dropdown supaya alurnya satu.
+function applyKind(kind) { $('aKind').value = kind; $('aKind').dispatchEvent(new Event('change')); syncQuick(); }
 function drawKinds() {
   const act = layout.slots.filter(s => s.enabled), gap = Number($('aGap').value);
   const key = act.map(s => s.id + ':' + (s.crop.w / s.crop.h).toFixed(3) + ':' + !!s.image).join() + '|' + gap;
@@ -197,7 +200,7 @@ function drawKinds() {
       b.type = 'button'; b.className = 'kind'; b.dataset.kind = o.value; b.title = o.text; b.setAttribute('aria-label', o.text);
       const rects = autoLayout(act, o.value, gap, CANVAS).map(s => `<rect class="${s.image ? 'v' : 't'}" x="${s.place.x}" y="${s.place.y}" width="${s.place.w}" height="${s.place.h}" rx="24"/>`).join('');
       b.innerHTML = `<svg viewBox="0 0 1920 1080" aria-hidden="true"><rect class="c" width="1920" height="1080" rx="40"/>${rects}</svg>`;
-      b.onclick = () => { $('aKind').value = o.value; $('aKind').dispatchEvent(new Event('change')); syncQuick(); };
+      b.onclick = () => applyKind(o.value);
       return b;
     }));
   }
@@ -217,7 +220,8 @@ function runBulk(transition = false) {
   layout.slots = slots;
   renderSoon(); // slider mengirim input ~60x/detik: bangun ulang editor paling sering sekali per frame
   clearTimeout(bulkTimer);
-  bulkTimer = setTimeout(() => sendLayout(transition), 60); // true = template otomatis dipilih: dianimasikan di OBS
+  bulkAnim ||= transition; // true = template otomatis dipilih: dianimasikan di OBS, walau slider menyusul dalam 60 ms
+  bulkTimer = setTimeout(() => { sendLayout(bulkAnim); bulkAnim = false; }, 60);
 }
 for (const id of ['bWidth', 'bCols', 'bGap']) {
   $(id).oninput = e => {
@@ -251,8 +255,7 @@ $('aKind').onchange = e => {
 };
 $('aGap').oninput = e => {
   $('aGapVal').textContent = e.target.value;
-  drawKinds();
-  if (!bulk.auto) return;
+  if (!bulk.auto) return drawKinds(); // template aktif: render() per frame yang menggambar ulang
   bulk.auto.gap = Number(e.target.value);
   runBulk();
 };
@@ -283,7 +286,7 @@ function presetThumb(slots) {
   svg.setAttribute('class', 'pthumb');
   svg.setAttribute('viewBox', '0 0 ' + CANVAS.w + ' ' + CANVAS.h);
   svg.setAttribute('aria-hidden', 'true');
-  for (const { place: r } of slots) {
+  for (const { place: r } of shownSlots(slots)) {
     const rect = document.createElementNS(SVG_NS, 'rect');
     for (const [k, v] of [['x', r.x], ['y', r.y], ['width', Math.max(30, r.w)], ['height', Math.max(30, r.h)]]) rect.setAttribute(k, Math.round(v));
     svg.append(rect);
@@ -292,7 +295,7 @@ function presetThumb(slots) {
 }
 // Nama orang di preset (frame kamera yang sudah dinamai; DC 1, DC 2, ... dan virtual frame tidak dihitung).
 const presetPeople = p => (p.full ? p.slots.filter(s => !s.image && s.name && !/^DC \d+$/.test(s.name)).map(s => s.name) : []);
-const presetInfo = p => { const who = presetPeople(p); return p.slots.length + ' frame · ' + (who.length ? who.join(', ') : p.full ? 'dengan akun' : 'susunan saja'); };
+const presetInfo = p => { const who = presetPeople(p); return shownSlots(p.slots).length + ' frame · ' + (who.length ? who.join(', ') : p.full ? 'dengan akun' : 'susunan saja'); };
 const tempTime = t => {
   const d = new Date(t), hm = d.toTimeString().slice(0, 5);
   return d.toDateString() === new Date().toDateString() ? hm : d.toLocaleDateString(getLang() === 'id' ? 'id-ID' : 'en-GB', { day: 'numeric', month: 'short' }) + ' ' + hm;
@@ -335,7 +338,9 @@ function presetRow(p, temp) {
   row.onkeydown = e => { if (e.key === 'Enter' && e.target === row) go(); };
   return row;
 }
+let shownLists = []; // daftar preset/Temp yang sedang tampil: render() tidak membangunnya ulang bila sama
 function renderPresets() {
+  shownLists = [layout.presets, layout.temp];
   reportDeck();
   const temp = pTab === 'temp';
   for (const b of $('pTabs').children) b.setAttribute('aria-pressed', String(b.dataset.tab === pTab));
@@ -393,15 +398,17 @@ function popoverAt(pop, anchor) {
 }
 const presetBtn = (text, fn, cls = '') => { const b = document.createElement('button'); b.type = 'button'; b.textContent = text; b.className = cls; b.onclick = () => fn(b); return b; };
 // Aksi yang tidak bisa dibatalkan: klik pertama mempersenjatai tombol, klik kedua dalam 3 detik menjalankan.
+// Klik dua kali untuk aksi berbahaya. label null: tombol ikon, teksnya tidak diganti.
 function armed(b, label, armedLabel, fn) {
+  const text = t => { if (label != null) b.textContent = t; };
   if (!b.classList.contains('armed')) {
     b.classList.add('armed');
-    b.textContent = armedLabel;
-    setTimeout(() => { b.classList.remove('armed'); b.textContent = label; }, 3000);
+    text(armedLabel);
+    setTimeout(() => { b.classList.remove('armed'); text(label); }, 3000);
     return;
   }
   b.classList.remove('armed');
-  b.textContent = label;
+  text(label);
   fn();
 }
 // Tombol preset di bawah kanvas dan di menu Lainnya: terapkan + pin.
@@ -412,9 +419,9 @@ function quickPreset(p) {
   const b = document.createElement('button');
   b.type = 'button';
   const n = document.createElement('small');
-  n.textContent = p.slots.length + ' frame';
+  n.textContent = shownSlots(p.slots).length + ' frame';
   b.append(p.name || 'Tanpa nama', n);
-  b.title = 'Terapkan preset (' + p.slots.length + ' frame)';
+  b.title = 'Terapkan preset (' + n.textContent + ')';
   b.onclick = () => { $('morePresets').hidePopover(); applyPreset(p); };
   const pin = document.createElement('button');
   pin.type = 'button';
@@ -462,21 +469,24 @@ const capturedSize = () => (video.videoWidth ? { frameW: video.videoWidth, frame
 // kosong, sama persis dengan preset tersimpan, atau sama dengan catatan Temp terakhir.
 function pushTemp(name) {
   if (!layout.slots.length) return;
-  const slots = presetSlots(layout.slots, true), json = JSON.stringify(slots);
+  const slots = presetSlots(layout.slots, true), json = JSON.stringify(slots), part = JSON.stringify(presetSlots(layout.slots, false));
   if (layout.temp[0] && JSON.stringify(layout.temp[0].slots) === json) return;
-  if (layout.presets.some(p => JSON.stringify(p.full ? slots : presetSlots(layout.slots, false)) === JSON.stringify(p.slots))) return;
+  if (layout.presets.some(p => (p.full ? json : part) === JSON.stringify(p.slots))) return;
   layout.temp = [{ id: 't' + Date.now().toString(36), name: String(name).slice(0, 40), slots, pinned: false, full: true, ...capturedSize(), t: Date.now() }, ...layout.temp].slice(0, MAX_TEMP);
   renderPresets();
 }
 // exact: kembali ke catatan Temp apa adanya (tanpa membawa frame Discord dari susunan sekarang).
+let presetSeq = 0;
 async function applyPreset(p, exact = false) {
+  const seq = ++presetSeq;
   pushTemp(exact ? 'Temp ' + tempTime(p.t) : p.name || 'Tanpa nama');
   for (const s of layout.slots) if (s.image) layout.library = rememberVirtual(layout.library, s); // virtual frame yang hilang dari kanvas tetap tersimpan
   // crop preset dibuat untuk ukuran capture saat disimpan: skalakan dulu ke capture sekarang (hanya slot dari preset)
   const scaled = p.frameW && video.videoWidth ? { ...p, slots: rescaleSlots(p.slots, { w: p.frameW, h: p.frameH }, frame()) } : p;
   let next = withVirtualSources(exact ? structuredClone(scaled.slots) : applyPresetSlots(scaled, layout.slots), layout.library)
     .map(s => ({ ...s, crop: s.image ? s.crop : clampRect(s.crop, frame()), probe: clampRect(s.probe, frame()), place: clampRect(s.place, CANVAS) }));
-  const gone = await missingImages(next); // frame tanpa gambar dilewati, bukan jadi kotak kosong di OBS
+  const gone = next.some(s => s.image) ? await missingImages(next) : new Set(); // frame tanpa gambar dilewati, bukan jadi kotak kosong di OBS
+  if (seq !== presetSeq) return; // preset lain sudah ditekan selagi menunggu
   if (gone.size) next = next.filter(s => !gone.has(s.image));
   resetBulk();
   bulk.snapshot = structuredClone(layout.slots); // supaya bisa diurungkan
@@ -575,6 +585,7 @@ function stepHistory(from, to) {
   if (!from.length || cropDlg.isOpen()) return;
   to.push(JSON.stringify(layout));
   layout = JSON.parse(from.pop());
+  if (video.videoWidth) fitCrops(); // riwayat menyimpan crop di ukuran capture saat itu
   savedJson = JSON.stringify(layout); lastPush = 0;
   resetBulk();
   ws.send({ type: 'layout', layout });
@@ -888,10 +899,7 @@ function render() {
     del.innerHTML = TRASH_SVG;
     del.addEventListener('pointerdown', e => e.stopPropagation());
     del.addEventListener('dblclick', e => e.stopPropagation()); // dua klik hapus bukan klik-ganda tile
-    del.onclick = () => {
-      if (!del.classList.contains('armed')) { del.classList.add('armed'); setTimeout(() => del.classList.remove('armed'), 3000); return; }
-      deleteSlot(s.id);
-    };
+    del.onclick = () => armed(del, null, null, () => deleteSlots([s.id]));
     const reset = document.createElement('button');
     reset.type = 'button';
     reset.className = 'reset';
@@ -903,7 +911,7 @@ function render() {
     reset.onclick = () => {
       select(s.id);
       s.crop = s.image ? { ...s.baseCrop } : clampRect(s.baseCrop ?? s.crop, frame()); // virtual: tanpa batas capture
-      if (!s.image) markFrame();
+      if (!s.image && !layout.settings.frameW) markFrame(); // acuan milik semua crop: hanya diisi bila belum ada
       s.place = clampRect({ ...s.place, w: TILE_W, h: ratioHeight(TILE_W, s.crop) }, CANVAS);
       commit(); render();
     };
@@ -911,12 +919,12 @@ function render() {
     const handles = [...addCorners(tile), ...addCorners(tile, ['n', 's', 'e', 'w'])]; // sisi hanya aktif saat Alt (lihat CSS body.alt)
     // Ctrl+klik: tambah/lepas dari pilihan. Klik biasa di luar pilihan: kembali pilih satu.
     tile.addEventListener('pointerdown', e => {
-      dropped = false;
+      dropped = null;
       if (e.ctrlKey || e.metaKey) {
         if (!group.size && selected && selected !== s.id && boxes.has(selected)) group.add(selected);
         if (group.has(s.id)) {
           group.delete(s.id);
-          dropped = true; // yang baru dilepas tidak ikut digeser
+          dropped = s.id; // yang baru dilepas tidak ikut digeser
           const next = [...group].at(-1) ?? null;
           if (group.size < 2) group.clear();
           selected = null; select(next); markSel();
@@ -936,9 +944,9 @@ function render() {
     attachDrag(tile, handles, {
       get: () => s.place,
       scale: layoutScale,
-      canResize: () => !s.placeLocked && !dropped,
+      canResize: () => !s.placeLocked && dropped !== s.id,
       begin: () => {
-        if (dropped) { moving = []; return; }
+        if (dropped === s.id) { moving = []; return; }
         select(s.id); cropStart = { ...s.crop }; placeStart = { ...s.place }; // yang diubah = yang terpilih (acuan Jadikan ukuran utama)
         moving = group.has(s.id) ? layout.slots.filter(o => group.has(o.id) && o.enabled) : [s];
         starts = moving.map(o => ({ ...o.place }));
@@ -973,7 +981,7 @@ function render() {
         const others = layout.slots.filter(o => o !== s && o.enabled);
         if (alt || corner.length === 1) {
           ({ place: s.place, crop: s.crop } = cropFromTile(r, placeStart, cropStart, s.image ? null : frame())); // virtual: boleh melewati tepi gambar
-          if (!s.image) markFrame();
+          if (!s.image && !layout.settings.frameW) markFrame(); // acuan milik semua crop: hanya diisi bila belum ada
           if (s.image) updateTile(tile, s, slotStyle(s)); // frame virtual: posisi gambar ikut crop baru
           showGuides({ x: [], y: [] }, $('layoutInner'), 1); showMatch($('layoutInner'), 1, null);
           positionAll();
@@ -998,7 +1006,7 @@ function render() {
   fillForm();
   showArrange();
   fillGeneral();
-  renderPresets();
+  if (shownLists[0] !== layout.presets || shownLists[1] !== layout.temp) renderPresets(); // slider/geser memanggil render() tiap frame; tiap pengubah preset memanggil renderPresets() sendiri
   renderLibInfo();
   $('sAnimate').checked = layout.settings.animate;
   $('pTransition').value = String(layout.settings.transitionMs ?? 400);
@@ -1050,8 +1058,7 @@ $('dsV').onclick = () => arrange(rs => distribute(rs, 'y'));
 const arGap = () => Math.min(400, Math.max(0, Math.round(Number($('arGap').value) || 0)));
 $('arGap').onchange = () => arrange(rs => spaceRects(rs, axisOf(rs), arGap()));
 $('tidy').onclick = () => arrange(rs => tidy(rs, arGap()));
-let dropped = false; // pointerdown terakhir = Ctrl+klik yang melepas frame dari pilihan: jangan digeser
-const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+let dropped = null; // id frame yang baru dilepas dari pilihan lewat Ctrl+klik: jangan digeser (pegangan sudut tidak mereset ini)
 
 // Tarik kotak di area kosong: pilih semua frame yang tersentuh (Ctrl = tambahkan ke pilihan). Klik saja = batal pilih banyak.
 $('layoutStage').addEventListener('pointerdown', e => {
@@ -1090,16 +1097,28 @@ document.addEventListener('keydown', e => {
   group.clear(); markSel();
 });
 
-function deleteSlot(id) {
-  layout.library = rememberVirtual(layout.library, layout.slots.find(s => s.id === id)); // virtual frame tetap ada di daftar
-  layout.slots = layout.slots.filter(s => s.id !== id);
-  if (selected === id) selected = null;
-  setSpeaking(id, false); // preview dan server tidak boleh menyimpan glow slot yang sudah dihapus
-  speaking.delete(id);
-  debouncers.delete(id);
-  lastRatio.delete(id);
-  commit(); render();
+function deleteSlots(ids) {
+  for (const id of ids) {
+    layout.library = rememberVirtual(layout.library, layout.slots.find(s => s.id === id)); // virtual frame tetap ada di daftar
+    layout.slots = layout.slots.filter(s => s.id !== id);
+    if (selected === id) selected = null;
+    setSpeaking(id, false); // preview dan server tidak boleh menyimpan glow slot yang sudah dihapus
+    speaking.delete(id);
+    debouncers.delete(id);
+    lastRatio.delete(id);
+  }
+  commit(); render(); // satu commit = satu langkah Ctrl+Z
+  setStatus(ids.length + ' frame dihapus · Ctrl+Z untuk membatalkan');
 }
+// frame terpilih (satu atau pilih banyak): tombol tong sampah di bar rata (klik dua kali) atau tombol Delete
+const deleteSelected = () => { const ids = arrangeTargets().map(s => s.id); if (ids.length) deleteSlots(ids); };
+$('arDel').onclick = () => armed($('arDel'), null, null, deleteSelected);
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Delete' || e.ctrlKey || e.altKey || cropDlg.isOpen() || document.querySelector('dialog[open], :popover-open')) return;
+  if (e.target.matches?.('input, textarea, select, [contenteditable]')) return; // Delete di kotak teks tetap menghapus huruf
+  e.preventDefault();
+  deleteSelected();
+});
 
 function fillForm() {
   const s = selectedSlot();
@@ -1250,6 +1269,12 @@ function markFrame() {
 // - rasio sama: Discord menskalakan isinya, jadi crop dan kotak deteksi ikut diskalakan, lalu capture ini jadi acuan.
 // - rasio beda: Discord menyusun ulang isinya dan tidak bisa diikuti. Crop dan acuan dibiarkan, jadi crop pas lagi
 //   begitu ukuran jendela dikembalikan (bagian crop di luar capture tidak digambar).
+// Rasio capture sama dengan acuan: skalakan crop ke capture sekarang. false = tidak berubah (ukuran atau rasio beda).
+function fitCrops() {
+  const next = rescaleSlots(layout.slots, { w: layout.settings.frameW, h: layout.settings.frameH }, frame());
+  if (next === layout.slots) return false;
+  layout.slots = next; markFrame(); return true;
+}
 const RESIZE_NOTE = 'Ukuran jendela Discord berubah. Kembalikan ukurannya, atau atur ulang crop.';
 const clearResizeNote = () => { if (original($('status')) === RESIZE_NOTE) setStatus(''); }; // crop sudah pas lagi (teks asli, bukan terjemahan)
 function reclamp() {
@@ -1257,17 +1282,13 @@ function reclamp() {
   const f = frame(), ref = { w: layout.settings.frameW, h: layout.settings.frameH };
   if (!ref.w) { markFrame(); commit(); return; } // layout lama: anggap crop dibuat untuk capture ini
   if (ref.w === f.w && ref.h === f.h) { clearResizeNote(); positionAll(); return; } // kembali ke ukuran acuan: crop sudah pas
-  const next = rescaleSlots(layout.slots, ref, f);
-  const scaled = next !== layout.slots;
+  const scaled = fitCrops();
   log('frame_resize', { from: ref.w + 'x' + ref.h, to: f.w + 'x' + f.h, scaled });
   if (!scaled) {
     setStatus(RESIZE_NOTE, true);
     positionAll();
     return;
   }
-  layout.slots = next;
-  markFrame();
-  clearResizeNote();
   cropDlg.reclamp(f.w / ref.w); // popup terbuka: draft ikut diskalakan
   positionAll();
   commit();
@@ -1316,16 +1337,22 @@ video.addEventListener('resize', () => { clearTimeout(reclampTimer); reclampTime
 
 // ---- deteksi bicara: hijau di kotak deteksi kecil tiap slot (≈10 Hz) ----
 const SAMPLE = 32; // kotak deteksi diskalakan ke 32x32 sebelum dibaca
-const probeCanvas = document.createElement('canvas');
-probeCanvas.width = SAMPLE; probeCanvas.height = SAMPLE;
-const pctx = probeCanvas.getContext('2d', { willReadFrequently: true });
+// Semua kotak deteksi digambar dulu ke satu atlas di GPU (32x32 per slot), lalu dibaca ke CPU sekali per putaran.
+// Menggambar video langsung ke kanvas CPU (willReadFrequently) membaca ulang seluruh frame capture dari GPU tiap
+// panggilan (frame NV12 dikonversi utuh): diukur 50 ms untuk 4 slot di capture 2404x1294, dengan atlas 12 ms.
+const atlas = document.createElement('canvas'), actx = atlas.getContext('2d');
+const reader = document.createElement('canvas'), rctx = reader.getContext('2d', { willReadFrequently: true });
+atlas.height = reader.height = SAMPLE;
 const debouncers = new Map();
 const lastRatio = new Map();
 
-function sample(s) {
-  pctx.clearRect(0, 0, SAMPLE, SAMPLE); // bagian yang keluar frame tidak boleh mewarisi piksel slot lain
-  pctx.drawImage(video, s.probe.x, s.probe.y, s.probe.w, s.probe.h, 0, 0, SAMPLE, SAMPLE);
-  return greenFraction(pctx.getImageData(0, 0, SAMPLE, SAMPLE).data);
+function sampleAll(slots) {
+  const w = SAMPLE * Math.max(1, slots.length);
+  if (atlas.width !== w) atlas.width = reader.width = w; else actx.clearRect(0, 0, w, SAMPLE); // bagian di luar frame tidak boleh mewarisi piksel lain
+  slots.forEach((s, i) => actx.drawImage(video, s.probe.x, s.probe.y, s.probe.w, s.probe.h, i * SAMPLE, 0, SAMPLE, SAMPLE));
+  rctx.clearRect(0, 0, w, SAMPLE);
+  rctx.drawImage(atlas, 0, 0);
+  return slots.map((_, i) => greenFraction(rctx.getImageData(i * SAMPLE, 0, SAMPLE, SAMPLE).data));
 }
 
 // metrik diagnosis (dikirim berkala ke log)
@@ -1352,11 +1379,13 @@ function detectTick() {
   if (lastTickAt) { const gap = t0 - lastTickAt; gapStat.add(gap); if (gap > 500) slowTicks++; }
   lastTickAt = t0;
   const canSample = stream && video.videoWidth && layout.settings.detectEnabled && !trackMuted; // muted: frame beku, outline lama bisa terbaca terus
+  const probed = canSample ? layout.slots.filter(s => !s.discordId && s.enabled && s.detect && !s.image) : [];
+  const ratios = new Map(probed.length ? sampleAll(probed).map((r, i) => [probed[i].id, r]) : []);
   for (const s of layout.slots) {
     // Official: hanya dari Discord; selama Discord terputus frame ini diam (tidak kembali ke kotak hijau).
     if (s.discordId) { lastRatio.delete(s.id); speakInfo = { via: 'discord' }; setSpeaking(s.id, viaDiscord(s) && discordSpeaks(s)); continue; }
     if (!canSample || !s.enabled || !s.detect || s.image) { setSpeaking(s.id, false); lastRatio.delete(s.id); continue; } // virtual: bicara hanya dari Discord
-    const ratio = sample(s);
+    const ratio = ratios.get(s.id);
     lastRatio.set(s.id, ratio);
     if (!debouncers.has(s.id)) debouncers.set(s.id, createDebouncer());
     const hit = ratio >= layout.settings.greenMin;
@@ -1369,7 +1398,7 @@ function detectTick() {
   if (!canSample) { $('ratio').textContent = '-'; return; }
   costStat.add(performance.now() - t0);
   if (cur?.mode === 'manual') { // popup Crop: bacaan langsung untuk kotak deteksi yang sedang diatur
-    const r = sample(cur.slot);
+    const r = sampleAll([cur.slot])[0];
     $('ratio').textContent = r.toFixed(3);
     cropDlg.markHit(r >= cur.greenMin);
   } else $('ratio').textContent = '-';
@@ -1613,128 +1642,7 @@ if (window.wakuApp?.bugReport) {
 }
 
 // ---- update aplikasi (hanya di aplikasi Electron; unduh/pasang di versi installer) ----
-if (window.wakuApp?.update) {
-  $('updBox').hidden = false;
-  const show = s => {
-    const v = s.version ?? '';
-    const info = {
-      dev: 'Update hanya tersedia di versi installer.', idle: 'Belum dicek.', checking: 'Mengecek update...', none: 'Waku sudah versi terbaru.',
-      available: 'Versi ' + v + ' tersedia.', downloading: 'Mengunduh versi ' + v + '... ' + (s.percent ?? 0) + '%',
-      ready: 'Versi ' + v + ' siap dipasang. Waku akan ditutup sebentar lalu terbuka lagi; capture perlu diulang.',
-      error: 'Gagal: ' + (s.msg ?? ''),
-    };
-    $('updInfo').textContent = info[s.status] ?? '';
-    const b = $('updBtn');
-    b.hidden = s.status === 'dev';
-    b.disabled = s.status === 'checking' || s.status === 'downloading';
-    b.classList.remove('armed');
-    b.textContent = s.status === 'available' ? 'Lihat versi ' + v : s.status === 'ready' ? 'Restart & pasang' : 'Cek update';
-    $('updChip').hidden = !['available', 'downloading', 'ready'].includes(s.status) || (s.status === 'available' && s.skipped);
-    $('updState').textContent = s.status === 'downloading' ? (s.percent ?? 0) + '%' : s.status === 'ready' ? 'siap' : 'v' + v;
-    $('updState').className = s.status === 'ready' ? 'on' : 'wait';
-    if ($('updDlg').open) updPopup(s);
-    if (s.prompt) { updPopup(s); $('updDlg').showModal(); window.wakuApp.update('seen'); }
-  };
-  // Popup update: versi sekarang, versi terbaru, dan catatan rilis dari GitHub (bagian bahasa yang aktif).
-  let last = {};
-  const updPopup = s => {
-    last = s;
-    const v = s.version ?? '', has = ['available', 'downloading', 'ready'].includes(s.status);
-    $('updCur').textContent = s.current ? 'v' + s.current : '-';
-    $('updNew').textContent = has ? 'v' + v : s.status === 'none' && s.current ? 'v' + s.current : '-';
-    $('updNew').className = has ? 'new' : '';
-    $('updMsg').textContent = {
-      checking: 'Mengecek update...', none: 'Waku sudah versi terbaru.', available: 'Versi ' + v + ' tersedia.',
-      downloading: 'Mengunduh versi ' + v + '... ' + (s.percent ?? 0) + '%',
-      ready: 'Versi ' + v + ' siap dipasang. Waku akan ditutup sebentar lalu terbuka lagi; capture perlu diulang.',
-      error: 'Gagal: ' + (s.msg ?? ''), dev: 'Update hanya tersedia di versi installer.',
-    }[s.status] ?? '';
-    $('updBar').hidden = s.status !== 'downloading';
-    $('updBarFill').style.width = (s.percent ?? 0) + '%';
-    const { hl, all } = has ? releaseNotes(s.notes) : { hl: [], all: null };
-    $('updHlList').replaceChildren(...hl);
-    $('updHl').hidden = !hl.length;
-    $('updNotes').replaceChildren(...(all ? [all] : []));
-    $('updAll').hidden = !all;
-    if (!hl.length) $('updAll').open = true; // tanpa highlight: langsung tampilkan semua perubahan
-    const go = $('updGo');
-    go.hidden = !['available', 'downloading', 'ready', 'error'].includes(s.status);
-    go.disabled = s.status === 'downloading';
-    go.classList.remove('armed');
-    go.textContent = s.status === 'ready' ? 'Restart & pasang' : s.status === 'error' ? 'Coba lagi' : 'Update';
-    $('updSkip').hidden = s.status !== 'available' || !!s.skipped;
-    $('updLater').textContent = has ? 'Nanti' : 'Tutup';
-  };
-  // restart menghentikan capture: klik dua kali
-  $('updGo').onclick = () => {
-    if (last.status === 'available') window.wakuApp.update('download');
-    else if (last.status === 'ready') armed($('updGo'), 'Restart & pasang', 'Klik lagi untuk restart', () => window.wakuApp.update('install'));
-    else if (last.status === 'error') window.wakuApp.update('check');
-  };
-  $('updSkip').onclick = () => { window.wakuApp.update('skip'); $('updDlg').close(); };
-  $('updLater').onclick = () => $('updDlg').close();
-  const openUpd = async () => {
-    const s = await window.wakuApp.update('state');
-    updPopup(s);
-    $('updDlg').showModal();
-    if (['idle', 'none', 'error'].includes(s.status)) window.wakuApp.update('check');
-  };
-  $('updChip').onclick = openUpd;
-  $('updBtn').onclick = openUpd;
-  window.wakuApp.onUpdate(show);
-  show(await window.wakuApp.update('state'));
-}
-
-// Catatan rilis GitHub berupa HTML: hanya tag teks sederhana yang dipakai, sisanya jadi teks biasa.
-// Catatan ditulis dua bahasa dengan judul "English" / "Bahasa Indonesia"; tampilkan bagian bahasa yang aktif.
-// Daftar di bawah judul "### Highlight" dikumpulkan dari semua versi ke kotak "Alasan kenapa harus update" di atas.
-// list = [{ version, note }] semua versi yang terlewat, terbaru dulu.
-function releaseNotes(list) {
-  const hl = [], all = document.createElement('div');
-  for (const { version, note } of Array.isArray(list) ? list : []) {
-    const part = noteHtml(note);
-    if (!part) continue;
-    hl.push(...part.hl);
-    if (!part.body.textContent.trim()) continue;
-    if (version) { const h = document.createElement('h2'); h.textContent = 'v' + version; all.append(h); }
-    all.append(part.body);
-  }
-  return { hl, all: all.childNodes.length ? all : null };
-}
-function noteHtml(html) {
-  if (!html) return null;
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const OK = new Set(['P', 'UL', 'OL', 'LI', 'STRONG', 'B', 'EM', 'CODE', 'BR', 'H3']);
-  const clean = n => {
-    if (n.nodeType === 3) return document.createTextNode(n.data);
-    if (n.nodeType !== 1) return null;
-    const tag = /^H[2-6]$/.test(n.nodeName) ? 'H3' : n.nodeName;
-    const out = OK.has(tag) ? document.createElement(tag) : document.createDocumentFragment();
-    for (const c of n.childNodes) { const x = clean(c); if (x) out.append(x); }
-    return out;
-  };
-  const want = getLang() === 'id' ? /indonesia/i : /english/i;
-  const head = [...doc.body.querySelectorAll('h2')].find(h => want.test(h.textContent));
-  const nodes = [];
-  if (head) for (let n = head.nextSibling; n && n.nodeName !== 'H2'; n = n.nextSibling) nodes.push(n);
-  else nodes.push(...doc.body.childNodes);
-  const hl = [], body = document.createDocumentFragment();
-  for (let i = 0; i < nodes.length; i++) {
-    const n = nodes[i];
-    if (/^H[3-6]$/.test(n.nodeName) && /highlight/i.test(n.textContent)) {
-      let k = i + 1;
-      while (k < nodes.length && nodes[k].nodeType !== 1) k++;
-      if (nodes[k]?.nodeName === 'UL' || nodes[k]?.nodeName === 'OL') {
-        for (const li of nodes[k].children) hl.push(clean(li));
-        i = k;
-      }
-      continue;
-    }
-    const x = clean(n);
-    if (x) body.append(x);
-  }
-  return { hl, body };
-}
+await initUpdates({ armed });
 
 // ---- shortcut global / Stream Deck (hanya di aplikasi Electron) ----
 if (window.wakuApp?.onCommand) {
@@ -1749,12 +1657,13 @@ if (window.wakuApp?.onCommand) {
   };
   applyState(await window.wakuApp.shortcuts());
 
-  // Aksi di dropdown disandikan "jenis:nilai": preset:<id>, template:<kunci> (kosong = berikutnya), detect:
-  const encode = a => (a ? a.type + ':' + (a.id ?? a.key ?? '') : '');
+  // Aksi di dropdown disandikan "jenis:nilai": preset:<id>, template:<kunci> (kosong = berikutnya), layout:<jenis>, detect:
+  const encode = a => (a ? a.type + ':' + (a.id ?? a.key ?? a.kind ?? '') : '');
   const decode = v => {
     const [type, val] = [v.slice(0, v.indexOf(':')), v.slice(v.indexOf(':') + 1)];
     if (type === 'preset') return { type, id: val };
     if (type === 'template') return val ? { type, key: val } : { type };
+    if (type === 'layout' && val) return { type, kind: val };
     if (type === 'detect') return { type };
     return null;
   };
@@ -1764,6 +1673,7 @@ if (window.wakuApp?.onCommand) {
     if (current?.type === 'preset' && !layout.presets.some(p => p.id === current.id)) opts.push([encode(current), 'Preset: (sudah dihapus)']);
     opts.push(['template:', 'Template berikutnya']);
     for (const [k, t] of Object.entries(TEMPLATES)) opts.push(['template:' + k, 'Template: ' + t.name]);
+    for (const o of $('aKind').options) if (o.value) opts.push(['layout:' + o.value, 'Susunan: ' + o.text]);
     opts.push(['detect:', 'Deteksi bicara nyala/mati']);
     return opts.map(([v, text]) => new Option(text, v));
   }
@@ -1850,12 +1760,19 @@ if (window.wakuApp?.onCommand) {
 
   window.wakuApp.onCommand(cmd => { log('shortcut', cmd); runCommand(cmd); });
   // Plugin Stream Deck: tombol status live, pilih preset dari nama. Aplikasi Stream Deck yang memasangnya.
-  $('deckInstall').onclick = async () => {
+  const installDeck = async () => {
     const err = await window.wakuApp.installDeck();
+    if (!err) $('deckUpd').hidden = true;
     $('deckInfo').textContent = !err ? ''
       : err === 'missing' ? 'File plugin tidak ditemukan. Jalankan npm run deck dulu.'
       : 'Gagal membuka plugin. Pastikan aplikasi Stream Deck terpasang.';
+    if (err) setStatus($('deckInfo').textContent);
   };
+  $('deckInstall').onclick = installDeck;
+  // update Waku tidak ikut memperbarui plugin di aplikasi Stream Deck: ingatkan sekali tiap Waku dibuka
+  $('deckUpdGo').onclick = installDeck;
+  $('deckUpdLater').onclick = () => { $('deckUpd').hidden = true; };
+  window.wakuApp.deckOutdated?.().then(old => { $('deckUpd').hidden = !old; });
 }
 
 // ---- perintah dari shortcut global dan plugin Stream Deck ----
@@ -1874,6 +1791,10 @@ function runCommand(cmd) {
     if (cropDlg.isOpen()) setStatus('Tutup popup Crop dulu sebelum ganti preset');
     else if (p) applyPreset(p);
     else setStatus('Preset untuk shortcut ini sudah dihapus');
+  } else if (cmd?.type === 'layout') { // template otomatis, sama seperti klik gambarnya di panel
+    const o = [...$('aKind').options].find(x => x.value && x.value === cmd.kind);
+    if (cropDlg.isOpen()) setStatus('Tutup popup Crop dulu sebelum ganti susunan');
+    else if (o) { applyKind(o.value); setStatus(o.text); }
   }
 }
 // Status untuk tombol Stream Deck: nama preset, template aktif, deteksi nyala/mati.
@@ -1881,6 +1802,7 @@ function reportDeck() {
   const state = {
     presets: layout.presets.map(p => ({ id: p.id, name: p.name || 'Tanpa nama' })),
     templates: Object.entries(TEMPLATES).map(([key, t]) => ({ key, name: t.name })),
+    layouts: [...$('aKind').options].filter(o => o.value).map(o => ({ key: o.value, name: o.text, short: tr(o.dataset.short) })), // short: judul di tombol Stream Deck
     template: layout.template || '',
     detect: !!layout.settings.detectEnabled,
   };

@@ -2,9 +2,9 @@
   "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   "UUID": "id.kurohiko.waku",
   "Name": "Waku",
-  "Version": "1.0.0.0",
+  "Version": "1.1.1.0",
   "Author": "Kurohiko",
-  "Description": "Control Waku (Discord co-op webcam overlay for OBS): switch presets and templates, toggle speaking detection.",
+  "Description": "Control Waku (Discord co-op webcam overlay for OBS): switch presets, templates and auto layouts, toggle speaking detection.",
   "Icon": "imgs/plugin",
   "Category": "Waku",
   "CategoryIcon": "imgs/category",
@@ -30,6 +30,15 @@
       "Icon": "imgs/action-template",
       "PropertyInspectorPath": "ui/template.html",
       "States": [{ "Image": "imgs/key-template", "TitleAlignment": "bottom", "FontSize": 11 }],
+      "Controllers": ["Keypad"]
+    },
+    {
+      "UUID": "id.kurohiko.waku.layout",
+      "Name": "Auto layout",
+      "Tooltip": "Arrange all cameras with an auto layout (left, right, bottom, grid, ...)",
+      "Icon": "imgs/action-layout",
+      "PropertyInspectorPath": "ui/layout.html",
+      "States": [{ "Image": "imgs/key-layout", "TitleAlignment": "bottom", "FontSize": 11 }],
       "Controllers": ["Keypad"]
     },
     {

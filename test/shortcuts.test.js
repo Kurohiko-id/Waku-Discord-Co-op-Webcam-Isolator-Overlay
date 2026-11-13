@@ -6,7 +6,8 @@ test('cleanShortcut: hanya kombinasi dan aksi yang dikenal, bidang lain dibuang'
   assert.deepEqual(cleanShortcut({ key: 'Control+Alt+P', action: { type: 'preset', id: 'p1', x: 1 }, extra: true }), { key: 'Control+Alt+P', action: { type: 'preset', id: 'p1' } });
   assert.deepEqual(cleanShortcut({ key: 'F13', action: { type: 'template', key: 'bad key!' } }), { key: 'F13', action: { type: 'template' } });
   assert.deepEqual(cleanShortcut({ key: 'num5', action: { type: 'detect' } }), { key: 'num5', action: { type: 'detect' } });
-  for (const bad of [null, {}, { key: 'Ctrl+P', action: { type: 'detect' } }, { key: 'Control+P', action: { type: 'run', cmd: 'calc' } }, { key: 'Control+P', action: { type: 'preset', id: '../x' } }, { key: 'F25', action: { type: 'detect' } }])
+  assert.deepEqual(cleanShortcut({ key: 'F14', action: { type: 'layout', kind: 'left', x: 1 } }), { key: 'F14', action: { type: 'layout', kind: 'left' } });
+  for (const bad of [null, {}, { key: 'Ctrl+P', action: { type: 'detect' } }, { key: 'Control+P', action: { type: 'run', cmd: 'calc' } }, { key: 'Control+P', action: { type: 'preset', id: '../x' } }, { key: 'F25', action: { type: 'detect' } }, { key: 'F14', action: { type: 'layout' } }, { key: 'F14', action: { type: 'layout', kind: 'bad kind!' } }])
     assert.equal(cleanShortcut(bad), null);
 });
 

@@ -1,7 +1,8 @@
-body { margin: 0; padding: 10px 12px; background: #2d2d2d; color: #d8d8d8; font: 12px/1.5 system-ui, "Segoe UI", sans-serif; }
-.row { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: 8px; }
-label { color: #969696; }
-select { width: 100%; height: 26px; background: #3d3d3d; color: #d8d8d8; border: 1px solid #4d4d4d; border-radius: 3px; padding: 0 6px; font: inherit; }
+body { margin: 0; padding: 10px 34px 10px 12px; background: #2d2d2d; color: #d8d8d8; font: 12px/1.5 system-ui, "Segoe UI", sans-serif; }
+.row { display: grid; grid-template-columns: 86px 1fr; align-items: center; gap: 6px; } /* sejajar dengan baris Title bawaan Stream Deck */
+label { color: #969696; text-align: right; }
+label::after { content: ':'; }
+select { width: 100%; height: 26px; background: #3d3d3d; color: #d8d8d8; border: 1px solid transparent; border-radius: 3px; padding: 0 6px; font: inherit; }
 select:focus { outline: none; border-color: #6e8bd8; }
-#note { margin: 8px 0 0 98px; color: #969696; }
+#note { margin: 8px 0 0 92px; color: #969696; }
 #note:empty { display: none; }

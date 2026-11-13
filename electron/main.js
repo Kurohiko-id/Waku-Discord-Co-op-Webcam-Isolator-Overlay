@@ -12,6 +12,7 @@ import { bugReport } from './bug-report.js';
 import { createUpdater } from './updater.js';
 import { centerIn } from './placement.js';
 import { createStats } from './stats.js';
+import { deckOutdated } from './deck-version.js';
 import updaterPkg from 'electron-updater';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -204,6 +205,15 @@ ipcMain.handle('app:installDeck', async e => {
   mainLog('deck_install', { ok: !err, err: err || undefined });
   return err;
 });
+// Pengingat: plugin di aplikasi Stream Deck lebih lama dari yang dibawa Waku (update Waku tidak ikut memperbaruinya).
+const deckVersion = file => { try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, '')).Version; } catch { return null; } };
+ipcMain.handle('app:deckOutdated', e => {
+  if (!fromMain(e)) return null;
+  const dir = 'id.kurohiko.waku.sdPlugin';
+  const installed = deckVersion(path.join(app.getPath('appData'), 'Elgato', 'StreamDeck', 'Plugins', dir, 'manifest.json'));
+  const bundled = deckVersion(path.join(root, 'streamdeck', dir, 'manifest.json'));
+  return deckOutdated(installed, bundled);
+});
 ipcMain.handle('app:bugReport', async e => {
   if (!fromMain(e)) return null;
   const text = await bugReport({ port, lang: appLang() });
@@ -355,8 +365,8 @@ app.whenReady().then(() => {
   mainLog('app_start', { version: app.getVersion(), electron: process.versions.electron });
   const data = app.getPath('userData');
   migrate(data);
-  stats = createStats({ version: app.getVersion(), dir: data, enabled: app.isPackaged });
-  stats.start();
+  try { stats = createStats({ version: app.getVersion(), dir: data, enabled: app.isPackaged }); stats.start(); } // statistik rusak tidak boleh menahan jendela
+  catch (e) { stats = null; mainLog('stats_fail', { msg: errMsg(e) }); }
   captureHandler();
   startServer(p => { if (!port) { port = p; createWindow(p); createTray(); shortcuts.register(); setTimeout(() => updates.check(), 8000); } });
 });

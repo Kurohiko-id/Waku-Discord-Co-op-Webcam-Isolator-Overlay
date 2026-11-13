@@ -28,3 +28,15 @@ test('fitur yang sudah terkirim hari ini tidak dikirim ulang setelah Waku dibuka
   assert.deepEqual(b.got, ['f_label']);
   fs.rmSync(dir, { recursive: true });
 });
+
+test('fitur yang gagal terkirim (offline) dikirim lagi saat Waku dibuka berikutnya', async () => {
+  const { createStats } = await import('../electron/stats.js');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'waku-'));
+  const got = [];
+  createStats({ dir, enabled: true, client: { track: async () => false } }).features(['f_manual']);
+  await new Promise(r => setTimeout(r, 10));
+  createStats({ dir, enabled: true, client: { track: f => got.push(f) } }).features(['f_manual']);
+  assert.deepEqual(got, ['f_manual']);
+  fs.rmSync(dir, { recursive: true });
+});

@@ -3,7 +3,7 @@ import { resolveStyle } from '/shared/style.js';
 import { buildTile, updateTile } from '/shared/tile-dom.js';
 import { Stat, createLogger, watchIce } from '/shared/log.js';
 import { iceDone } from '/shared/rtc.js';
-import { matchSlots } from '/shared/transition.js';
+import { matchSlots, sameView } from '/shared/transition.js';
 
 const v = document.getElementById('v');
 const root = document.getElementById('root');
@@ -18,7 +18,7 @@ const ws = connect('preview', onMsg, ok => { if (ok) { ws.send({ type: 'ready' }
 const log = createLogger(ws);
 log('session_start', { ua: navigator.userAgent, screen: screen.width + 'x' + screen.height, dpr: devicePixelRatio });
 const latStat = new Stat(); // latensi pesan speaking dari halaman kontrol sampai sini (ms)
-let drawn = 0, prevDecoded = 0, prevDropped = 0;
+let drawn = 0, prevDecoded = 0, prevDropped = 0, tLoop = 0;
 
 function onMsg(msg) {
   if (msg.type === 'layout') {
@@ -30,7 +30,7 @@ function onMsg(msg) {
     if (plan) for (const p of plan) animateTile(p, ms);
     drawAll();
     // capture Discord yang diam bisa hanya ~1 fps: selama transisi gambar tiap frame layar, jangan tunggu frame video
-    if (plan) { const end = performance.now() + ms + 50; const loop = () => { drawAll(); if (performance.now() < end) requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
+    if (plan) { cancelAnimationFrame(tLoop); const end = performance.now() + ms + 50; const loop = () => { drawAll(); if (performance.now() < end) tLoop = requestAnimationFrame(loop); }; tLoop = requestAnimationFrame(loop); }
   }
   else if (msg.type === 'speaking') {
     if (typeof msg.t === 'number') latStat.add(Date.now() - msg.t);
@@ -74,7 +74,6 @@ function build() {
 const EASE = 'cubic-bezier(.65, 0, .35, 1)'; // = easeInOutCubic, sama dengan crop di drawAll
 const ease = k => (k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2);
 const lerpRect = (a, b, k) => ({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, w: a.w + (b.w - a.w) * k, h: a.h + (b.h - a.h) * k });
-const overlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 const boxOf = el => { const c = getComputedStyle(el); return { left: c.left, top: c.top, width: c.width, height: c.height }; }; // ikut posisi di tengah animasi
 const boxPx = p => ({ left: p.x + 'px', top: p.y + 'px', width: p.w + 'px', height: p.h + 'px' });
 
@@ -89,7 +88,8 @@ function rekey(old, ms) {
     if (kind === 'baru') { plan.push({ id: b.id }); continue; }
     const t = prev.get(a.id), box = from.get(a.id);
     prev.delete(a.id);
-    if (kind === 'keluar' || kind === 'dekat') {
+    // isi beda (pasangan terdekat, atau nama/id sama tapi crop/gambar lain): crossfade di lintasan yang sama
+    if (kind === 'keluar' || kind === 'dekat' || !sameView({ ...a, crop: t.crop ?? a.crop }, b)) {
       leave(t, a, box, b && boxPx(b.place), ms);
       if (b) plan.push({ id: b.id, box, fade: true });
     } else {
@@ -116,8 +116,8 @@ function animateTile(p, ms) {
   if (!p.box) { t.el.animate([{ transform: 'scale(.6)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: ms, easing: EASE }); return; }
   const to = boxPx(s.place);
   t.el.animate(p.fade ? [{ ...p.box, opacity: 0 }, { ...to, opacity: 1 }] : [p.box, to], { duration: ms, easing: EASE });
-  // crop hanya bergeser bila tumpang tindih (orang yang sama, zoom beda); kalau tidak, menggeser melewati kamera orang lain
-  if (p.crop && !s.image && overlap(p.crop, s.crop)) t.move = { crop: p.crop, start: performance.now(), ms };
+  // elemen dipakai ulang hanya bila crop tumpang tindih (sameView): crop ikut bergeser (orang yang sama, zoom beda)
+  if (p.crop && !s.image) t.move = { crop: p.crop, start: performance.now(), ms };
 }
 
 function applySpeaking() {

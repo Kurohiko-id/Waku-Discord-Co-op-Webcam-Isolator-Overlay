@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('wakuApp', {
   setLang: l => ipcRenderer.send('app:setLang', l),
   openLogs: () => ipcRenderer.invoke('app:openLogs'),
   installDeck: () => ipcRenderer.invoke('app:installDeck'), // buka file plugin Stream Deck; '' = berhasil
+  deckOutdated: () => ipcRenderer.invoke('app:deckOutdated'), // true = plugin terpasang lebih lama dari bawaan Waku
   shortcuts: () => ipcRenderer.invoke('app:shortcuts'), // { list, failed }
   setShortcuts: keys => ipcRenderer.invoke('app:setShortcuts', keys),
   pauseShortcuts: paused => ipcRenderer.invoke('app:shortcutsPause', paused),

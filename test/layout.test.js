@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateLayout, newSlot, newSlotFrom, nextSlotName, presetOrder, carryDiscordSlots, mergeDraft, presetSlots, applyPresetSlots, virtualLibrary, rememberVirtual, forgetVirtual, withVirtualSources, rescaleSlots } from '../public/shared/layout.js';
+import { validateLayout, newSlot, newSlotFrom, nextSlotName, presetOrder, carryDiscordSlots, mergeDraft, presetSlots, applyPresetSlots, virtualLibrary, rememberVirtual, forgetVirtual, withVirtualSources, rescaleSlots, shownSlots } from '../public/shared/layout.js';
 import { defaultStyle, TEMPLATES } from '../public/shared/style.js';
 
 test('nextSlotName: DC 1 untuk layout kosong, lalu nomor terkecil yang kosong', () => {
@@ -362,4 +362,9 @@ test('ukuran frame capture tersimpan di settings dan di preset; nilai rusak jadi
   const l = validateLayout({ slots: [], settings: { frameW: 2560.4, frameH: 1440 }, presets: [{ id: 'p', name: 'p', slots: [newSlot('a', 0)], frameW: 1920, frameH: 'x' }] });
   assert.deepEqual([l.settings.frameW, l.settings.frameH], [2560, 1440]);
   assert.deepEqual([l.presets[0].frameW, l.presets[0].frameH], [1920, 0]);
+});
+
+test('shownSlots: frame tersembunyi tidak ikut gambar mini dan hitungan preset', () => {
+  const slots = [{ id: 'a', enabled: true }, { id: 'b', enabled: false }, { id: 'c' }];
+  assert.deepEqual(shownSlots(slots).map(s => s.id), ['a', 'c']);
 });

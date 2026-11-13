@@ -8,15 +8,15 @@ import WebSocket from 'ws';
 
 const arg = name => process.argv[process.argv.indexOf('-' + name) + 1];
 const UUID = 'id.kurohiko.waku';
-const ACT = { preset: UUID + '.preset', template: UUID + '.template', detect: UUID + '.detect' };
+const ACT = { preset: UUID + '.preset', template: UUID + '.template', layout: UUID + '.layout', detect: UUID + '.detect' };
 
 // ---- pengaturan Waku (port dan bahasa), dibaca ulang tiap menyambung ----
 const settingsFile = path.join(process.env.APPDATA || '', 'Waku', 'settings.json');
 const wakuSettings = () => { try { return JSON.parse(fs.readFileSync(settingsFile, 'utf8')); } catch { return {}; } };
 let lang = wakuSettings().lang === 'id' ? 'id' : 'en';
 const T = {
-  id: { offline: 'Waku\nmati', noControl: 'Buka\nWaku', pick: 'Pilih\npreset', gone: 'Preset\ndihapus', next: 'Berikutnya', on: 'Deteksi\nNYALA', off: 'Deteksi\nMATI' },
-  en: { offline: 'Waku\noff', noControl: 'Open\nWaku', pick: 'Pick a\npreset', gone: 'Preset\ndeleted', next: 'Next', on: 'Detect\nON', off: 'Detect\nOFF' },
+  id: { offline: 'Waku\nmati', noControl: 'Buka\nWaku', pick: 'Pilih\npreset', gone: 'Preset\ndihapus', pickLayout: 'Pilih\nsusunan', next: 'Berikutnya', on: 'Deteksi\nNYALA', off: 'Deteksi\nMATI' },
+  en: { offline: 'Waku\noff', noControl: 'Open\nWaku', pick: 'Pick a\npreset', gone: 'Preset\ndeleted', pickLayout: 'Pick a\nlayout', next: 'Next', on: 'Detect\nON', off: 'Detect\nOFF' },
 };
 const t = key => T[lang][key];
 
@@ -50,6 +50,10 @@ function title(k) {
     const name = st.templates.find(x => x.key === key)?.name ?? key;
     return k.settings.template ? wrap(name) : t('next') + '\n' + wrap(name);
   }
+  if (k.action === ACT.layout) {
+    const l = (st.layouts ?? []).find(x => x.key === k.settings.kind);
+    return l ? wrap(l.short || l.name) : t('pickLayout');
+  }
   if (k.action === ACT.detect) return st.detect ? t('on') : t('off');
   return '';
 }
@@ -62,7 +66,7 @@ function refresh(context) {
 const refreshAll = () => { for (const c of keys.keys()) refresh(c); };
 
 // Isi dropdown di panel pengaturan tombol (property inspector).
-const piData = context => ({ lang, connected: !!(waku?.readyState === 1 && status.control), presets: status.state?.presets ?? [], templates: status.state?.templates ?? [], settings: keys.get(context)?.settings ?? {} });
+const piData = context => ({ lang, connected: !!(waku?.readyState === 1 && status.control), presets: status.state?.presets ?? [], templates: status.state?.templates ?? [], layouts: status.state?.layouts ?? [], settings: keys.get(context)?.settings ?? {} });
 const toPi = context => sdSend({ event: 'sendToPropertyInspector', context, payload: piData(context) });
 let piContext = null; // tombol yang panelnya sedang terbuka
 
@@ -72,6 +76,7 @@ function press(context) {
   let action = null;
   if (k.action === ACT.preset && k.settings.presetId) action = { type: 'preset', id: k.settings.presetId };
   else if (k.action === ACT.template) action = k.settings.template ? { type: 'template', key: k.settings.template } : { type: 'template' };
+  else if (k.action === ACT.layout && k.settings.kind) action = { type: 'layout', kind: k.settings.kind };
   else if (k.action === ACT.detect) action = ['on', 'off'].includes(k.settings.mode) ? { type: 'detect', set: k.settings.mode } : { type: 'detect' };
   if (!action || waku?.readyState !== 1 || !status.control) return sdSend({ event: 'showAlert', context });
   waku.send(JSON.stringify({ type: 'cmd', action }));

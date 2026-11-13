@@ -156,3 +156,6 @@ export function snapSpacing(r, others, threshold = 12) {
   };
   return { x: solve('x', 'w', 'y', 'h'), y: solve('y', 'h', 'x', 'w') };
 }
+
+// Dua kotak {x,y,w,h} saling menutupi (bersentuhan di tepi tidak dihitung).
+export const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;

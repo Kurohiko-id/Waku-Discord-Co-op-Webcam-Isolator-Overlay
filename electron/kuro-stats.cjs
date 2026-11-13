@@ -16,6 +16,15 @@ function osName() {
   return process.platform + ' ' + r.split('-')[0];
 }
 
+// Path bisa memuat nama asli (folder user, folder pasang pilihan sendiri): sisakan nama filenya saja.
+const PATH = /(?:file:\/\/\/)?[A-Za-z]:[\\/][^\n'"()<>]*?(?=[\n'"()<>]|$|:\d)/g;
+const dec = t => { try { return decodeURIComponent(t); } catch { return t; } };
+function scrub(s, user) {
+  let out = String(s || '').replace(PATH, m => path.win32.basename(dec(m)));
+  if (user) out = out.replace(new RegExp(user.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '<user>');
+  return out;
+}
+
 module.exports = function kuroStats({ app, version, dir, endpoint = ENDPOINT, enabled = true, lang }) {
   const file = path.join(dir, 'kuro-stats.json');
   let st = {};
@@ -33,8 +42,7 @@ module.exports = function kuroStats({ app, version, dir, endpoint = ENDPOINT, en
         .then(r => r.ok, () => false)
     : Promise.resolve(false);
   const ping = async () => { if (st.day !== today() && await send('ping')) { st.day = today(); save(); } };
-  const home = os.homedir(), user = os.userInfo().username;
-  const scrub = s => String(s || '').split(home).join('~').split(user).join('<user>');
+  let user = ''; try { user = os.userInfo().username; } catch {}
 
   return {
     async start() {
@@ -47,8 +55,9 @@ module.exports = function kuroStats({ app, version, dir, endpoint = ENDPOINT, en
       setInterval(ping, 3600e3).unref(); // aplikasi yang nyala lewat tengah malam tetap terhitung di hari berikutnya
     },
     track: send,
-    error: e => send('error', { msg: scrub((e && e.message) || e).slice(0, 300), stack: scrub(e && e.stack).split('\n').slice(1, 4).join('\n').slice(0, 600) }),
+    error: e => send('error', { msg: scrub((e && e.message) || e, user).slice(0, 300), stack: scrub(e && e.stack, user).split('\n').slice(1, 4).join('\n').slice(0, 600) }),
     setEnabled: v => { on = !!v; },
     get uid() { return st.uid; },
   };
 };
+module.exports.scrub = scrub;

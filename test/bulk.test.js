@@ -187,3 +187,17 @@ test('autoLayout kiri-kanan: ukuran tile sama dengan rata bawah/atas', () => {
   const size = kind => autoLayout(make(4), kind, 32, CANVAS).map(s => [Math.round(s.place.w * 100), Math.round(s.place.h * 100)]);
   assert.deepEqual(size('sides'), size('bottom'));
 });
+
+test('autoLayout rata kiri/kanan: semua tile satu kolom menempel ke tepi itu, di tengah vertikal', () => {
+  const g = 20;
+  for (const n of [1, 3, 16]) {
+    for (const kind of ['left', 'right']) {
+      const out = autoLayout(make(n), kind, g, CANVAS).map(s => s.place);
+      for (const p of out) assert.ok(kind === 'left' ? Math.abs(p.x - g) < 1e-6 : Math.abs(p.x + p.w - (CANVAS.w - g)) < 1e-6);
+      const topGap = out[0].y, bottomGap = CANVAS.h - (out.at(-1).y + out.at(-1).h);
+      assert.ok(Math.abs(topGap - bottomGap) < 1e-6 && topGap >= g - 1e-6, 'kolom di tengah vertikal dan muat');
+    }
+  }
+  const size = kind => autoLayout(make(3), kind, 32, CANVAS).map(s => Math.round(s.place.h * 100));
+  assert.deepEqual(size('left'), size('bottom')); // ukuran strip sama dengan rata bawah
+});

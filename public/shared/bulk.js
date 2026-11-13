@@ -44,7 +44,7 @@ export function toGrid(slots, cols, gap, canvas = { w: 1920, h: 1080 }) {
   return slots.map(s => (placed.has(s.id) ? { ...s, place: placed.get(s.id) } : s));
 }
 
-export const AUTO_KINDS = ['grid', 'row', 'column', 'main-right', 'main-bottom', 'bottom', 'top', 'sides'];
+export const AUTO_KINDS = ['grid', 'row', 'column', 'main-right', 'main-bottom', 'bottom', 'top', 'left', 'right', 'sides'];
 
 // Rata tepi: tile berukuran "strip" (bukan memenuhi kanvas) yang menempel ke tepi, jarak antar tile = jarak ke tepi = g.
 // Lebar tiap tile mengikuti rasio crop-nya sendiri; bila tidak muat, semua tile mengecil bersama.
@@ -58,10 +58,11 @@ function edgeRects(active, kind, g, c) {
     const y = kind === 'top' ? g : c.h - g - h;
     return active.map(s => { const r = { x, y, w: h * ratioOf(s), h }; x += r.w + g; return r; });
   }
-  // sides: setengah pertama (dibulatkan ke atas) di kolom kiri, sisanya kanan; tiap kolom di tengah vertikal.
-  // Tinggi tile sama dengan rata atas/bawah (dan sama di kedua kolom); mengecil bersama bila kolom terpanjang tidak muat.
-  const left = active.slice(0, Math.ceil(active.length / 2)), right = active.slice(left.length);
-  const h = Math.min(c.h * STRIP_H, (c.h - 2 * g - g * (left.length - 1)) / left.length);
+  // Kolom: rata kiri/kanan = semua tile satu kolom; sides = setengah pertama (dibulatkan ke atas) kiri, sisanya kanan.
+  // Tiap kolom di tengah vertikal. Tinggi tile sama dengan rata atas/bawah; mengecil bersama bila kolom terpanjang tidak muat.
+  const left = kind === 'right' ? [] : kind === 'left' ? active : active.slice(0, Math.ceil(active.length / 2));
+  const right = active.slice(left.length), n = Math.max(left.length, right.length);
+  const h = Math.min(c.h * STRIP_H, (c.h - 2 * g - g * (n - 1)) / n);
   const column = (list, onLeft) => {
     let y = (c.h - (h * list.length + g * (list.length - 1))) / 2;
     return list.map(s => { const w = h * ratioOf(s); const r = { x: onLeft ? g : c.w - g - w, y, w, h }; y += h + g; return r; });
@@ -107,7 +108,7 @@ export function autoLayout(slots, kind, gap, canvas = { w: 1920, h: 1080 }) {
   const active = slots.filter(s => s.enabled);
   if (!AUTO_KINDS.includes(kind) || !active.length) return slots;
   const g = clampN(gap, 0, 100);
-  const rects = ['bottom', 'top', 'sides'].includes(kind) ? edgeRects(active, kind, g, canvas) : autoCells(kind, active.length, g, canvas).map((cell, i) => fit(active[i], cell));
+  const rects = ['bottom', 'top', 'left', 'right', 'sides'].includes(kind) ? edgeRects(active, kind, g, canvas) : autoCells(kind, active.length, g, canvas).map((cell, i) => fit(active[i], cell));
   const placed = new Map(active.map((s, i) => [s.id, clampRect(rects[i], canvas)]));
   return slots.map(s => (placed.has(s.id) ? { ...s, place: placed.get(s.id) } : s));
 }

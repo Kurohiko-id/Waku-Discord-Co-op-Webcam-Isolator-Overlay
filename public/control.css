@@ -65,6 +65,7 @@ button.sel { background: var(--accent-soft); border-color: var(--accent-line); c
 #toasts > span { pointer-events: auto; box-shadow: 0 10px 28px #0009; animation: toast-in .18s var(--ease); }
 @keyframes toast-in { from { opacity: 0; translate: 0 -6px; } }
 @media (prefers-reduced-motion: reduce) { #toasts > span { animation: none; } }
+#deckUpd { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 14px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); font-size: 12.5px; }
 #notice { padding: 7px 14px; border-radius: 8px; background: color-mix(in srgb, var(--bad) 16%, var(--surface)); border: 1px solid #e0675f88; color: #f1a39d; font-size: 12.5px; font-weight: 500; line-height: 1.4; text-align: center; }
 .pill { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 11px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--line); font-size: 12.5px; color: var(--ink2); cursor: help; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); }
@@ -636,6 +637,8 @@ label:has(> input[type=checkbox]) { justify-content: flex-start; }
 .arrange:not([hidden]) + small { display: none; }
 .arrange .btn.icon { width: 30px; height: 30px; }
 .arrange .btn.icon:disabled { opacity: .35; }
+.arrange .del:hover { color: var(--bad); }
+.arrange .del.armed { background: var(--bad); color: #2a0606; }
 .arrange .sep { width: 1px; height: 18px; margin: 0 6px; background: var(--line-2); }
 .ar-gap { display: flex; align-items: center; gap: 6px; margin: 0 4px 0 8px; font-size: 12px; color: var(--ink3); }
 .ar-gap input { width: 58px; height: 28px; }

@@ -122,6 +122,9 @@ export const withVirtualSources = (slots, library) => slots.map(s => {
 // Urutan tombol preset: yang disematkan dulu, lalu urutan simpanan (bisa diubah dengan drag). Tidak bergeser karena dipakai.
 export const presetOrder = presets => [...presets].sort((a, b) => b.pinned - a.pinned);
 
+// Frame yang tampil. Preset tetap menyimpan frame tersembunyi; gambar mini dan hitungan "N frame" hanya memakai yang tampil.
+export const shownSlots = slots => slots.filter(s => s.enabled !== false);
+
 // Isi preset dari slot sekarang. full = nama frame dan akun Discord ikut; tanpa itu hanya susunan
 // (crop, posisi, gaya; frame virtual tetap dengan gambar dan namanya). Slot asal tidak diubah.
 export function presetSlots(slots, full) {

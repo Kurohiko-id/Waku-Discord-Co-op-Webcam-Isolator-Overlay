@@ -1,19 +1,24 @@
 // Shortcut global (juga untuk tombol Hotkey Stream Deck), diatur sendiri oleh pengguna; awalnya kosong.
-// Setiap baris: { key: accelerator Electron, action: { type: 'preset', id } | { type: 'template', key? } | { type: 'detect' } }.
+// Setiap baris: { key: accelerator Electron, action: { type: 'preset', id } | { type: 'template', key? } | { type: 'layout', kind } | { type: 'detect' } }.
 // Aksinya dijalankan oleh halaman kontrol, walau jendelanya disembunyikan.
 // Tanpa import electron: globalShortcut dan penyimpanan diberikan pemanggil, jadi validasinya bisa dites di Node.
 
 const KEY_RE = /^(?:(?:Control|Alt|Shift|Super)\+){0,4}(?:[A-Z0-9]|F(?:[1-9]|1\d|2[0-4])|num[0-9])$/;
 const ID_RE = /^[\w-]{1,64}$/;
 
-// Baris shortcut yang bersih (hanya bidang yang dikenal), atau null bila tidak valid.
-export function cleanShortcut(s) {
-  const a = s?.action;
-  if (typeof s?.key !== 'string' || !KEY_RE.test(s.key) || !a) return null;
-  if (a.type === 'preset' && ID_RE.test(a.id)) return { key: s.key, action: { type: 'preset', id: a.id } };
-  if (a.type === 'template') return { key: s.key, action: ID_RE.test(a.key) ? { type: 'template', key: a.key } : { type: 'template' } };
-  if (a.type === 'detect') return { key: s.key, action: { type: 'detect' } };
+// Aksi yang bersih (hanya bidang yang dikenal), atau null. Dipakai juga server.js untuk perintah Stream Deck.
+export function cleanAction(a) {
+  if (a?.type === 'preset' && ID_RE.test(a.id)) return { type: 'preset', id: a.id };
+  if (a?.type === 'template') return ID_RE.test(a.key) ? { type: 'template', key: a.key } : { type: 'template' };
+  if (a?.type === 'layout' && typeof a.kind === 'string' && ID_RE.test(a.kind)) return { type: 'layout', kind: a.kind };
+  if (a?.type === 'detect') return ['on', 'off'].includes(a.set) ? { type: 'detect', set: a.set } : { type: 'detect' };
   return null;
+}
+
+// Baris shortcut yang bersih, atau null bila tidak valid.
+export function cleanShortcut(s) {
+  const action = typeof s?.key === 'string' && KEY_RE.test(s.key) ? cleanAction(s.action) : null;
+  return action && { key: s.key, action };
 }
 
 // send(action): kirim aksi ke halaman kontrol. log(event, data): catat kombinasi yang gagal didaftarkan.

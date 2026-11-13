@@ -21,8 +21,12 @@ export function createStats({ version, dir, enabled, client = kuroStats({ app: '
     if (day !== today()) { day = today(); sent = new Set(); }
     const fresh = list.filter(f => FEATURE.test(f) && !sent.has(f));
     if (!fresh.length) return;
-    for (const f of fresh) { sent.add(f); s.track(f); }
-    if (enabled) try { fs.writeFileSync(file, JSON.stringify({ day, sent: [...sent] })); } catch {} // dev berbagi folder data, jangan tandai
+    const save = () => { if (enabled) try { fs.writeFileSync(file, JSON.stringify({ day, sent: [...sent] })); } catch {} }; // dev berbagi folder data, jangan tandai
+    for (const f of fresh) {
+      sent.add(f); // langsung ditandai supaya tidak terkirim dobel selagi menunggu
+      Promise.resolve(s.track(f)).then(ok => { if (ok === false) { sent.delete(f); save(); } }); // offline: kirim lagi lain kali
+    }
+    save();
   };
   return {
     start() { s.start(); setInterval(() => features(), 3600e3).unref(); },

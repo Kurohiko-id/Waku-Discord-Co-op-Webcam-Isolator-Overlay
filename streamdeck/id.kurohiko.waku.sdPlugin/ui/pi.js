@@ -1,21 +1,21 @@
-// Panel pengaturan tombol (property inspector) di aplikasi Stream Deck. Satu skrip untuk ketiga aksi:
+// Panel pengaturan tombol (property inspector) di aplikasi Stream Deck. Satu skrip untuk semua aksi:
 // halaman HTML menentukan <select id="pick" data-key="..."> dan jenis isinya lewat data-kind.
 const TXT = {
   id: {
-    preset: 'Preset', template: 'Template', mode: 'Aksi', next: 'Template berikutnya', choose: 'Pilih preset...',
+    preset: 'Preset', template: 'Template', layout: 'Susunan', mode: 'Aksi', next: 'Template berikutnya', choose: 'Pilih preset...', chooseLayout: 'Pilih susunan...',
     toggle: 'Nyala/mati bergantian', on: 'Selalu nyalakan', off: 'Selalu matikan',
     offline: 'Waku belum jalan atau halaman kontrolnya tertutup. Buka Waku, daftar akan terisi sendiri.',
     empty: 'Belum ada preset. Simpan preset di Waku dulu.',
   },
   en: {
-    preset: 'Preset', template: 'Template', mode: 'Action', next: 'Next template', choose: 'Choose a preset...',
+    preset: 'Preset', template: 'Template', layout: 'Layout', mode: 'Action', next: 'Next template', choose: 'Choose a preset...', chooseLayout: 'Choose a layout...',
     toggle: 'Toggle on/off', on: 'Always turn on', off: 'Always turn off',
     offline: 'Waku is not running or its control page is closed. Open Waku and the list fills in by itself.',
     empty: 'No presets yet. Save a preset in Waku first.',
   },
 };
 const pick = document.getElementById('pick');
-const kind = pick.dataset.kind; // preset | template | detect
+const kind = pick.dataset.kind; // preset | template | layout | detect
 let sock, piUuid, action, settings = {};
 
 function render(d) {
@@ -24,6 +24,7 @@ function render(d) {
   document.getElementById('label').textContent = tx[kind === 'detect' ? 'mode' : kind];
   let opts;
   if (kind === 'preset') opts = [['', tx.choose], ...d.presets.map(p => [p.id, p.name])];
+  else if (kind === 'layout') opts = [['', tx.chooseLayout], ...(d.layouts ?? []).map(x => [x.key, x.name])];
   else if (kind === 'template') opts = [['', tx.next], ...d.templates.map(x => [x.key, x.name])];
   else opts = [['toggle', tx.toggle], ['on', tx.on], ['off', tx.off]];
   const cur = settings[pick.dataset.key] ?? opts[0][0];

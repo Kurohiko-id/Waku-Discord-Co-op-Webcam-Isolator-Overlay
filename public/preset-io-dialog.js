@@ -4,7 +4,7 @@
 import { buildExport, parseImport, uniqueName } from '/shared/preset-io.js';
 
 const $ = id => document.getElementById(id);
-import { MAX_PRESETS } from '/shared/layout.js';
+import { MAX_PRESETS, shownSlots } from '/shared/layout.js';
 const blobToDataUrl = blob => new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = fail; r.readAsDataURL(blob); });
 const dataUrlToBlob = d => { const [, type, b64] = d.match(/^data:(.*?);base64,(.*)$/); return new Blob([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], { type }); };
 const fileSafe = s => s.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'preset';
@@ -20,7 +20,7 @@ function presetRows(host, items) {
     const input = Object.assign(document.createElement('input'), { type: 'text', value: name, maxLength: 40 });
     input.setAttribute('aria-label', 'Nama preset');
     const count = document.createElement('small');
-    count.textContent = preset.slots.length + ' frame';
+    count.textContent = shownSlots(preset.slots).length + ' frame';
     row.append(check, input, count);
     if (note) { const n = document.createElement('small'); n.className = 'note'; n.textContent = note; row.append(n); }
     return { preset, check, input, row };

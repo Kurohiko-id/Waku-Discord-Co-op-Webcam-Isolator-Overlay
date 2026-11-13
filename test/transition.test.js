@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { matchSlots } from '../public/shared/transition.js';
+import { matchSlots, sameView } from '../public/shared/transition.js';
 
 const S = (id, x, y, o = {}) => ({ id, name: '', discordId: '', image: '', place: { x, y, w: 100, h: 60 }, ...o });
 const kinds = ps => ps.map(p => `${p.a?.id ?? '-'}>${p.b?.id ?? '-'}:${p.kind}`).sort();
@@ -34,4 +34,12 @@ test('matchSlots: frame gambar tidak dipasangkan dengan kamera', () => {
   const A = [S('cam', 0, 0)];
   const B = [S('logo', 0, 0, { image: '/uploads/logo.png' })];
   assert.deepEqual(kinds(matchSlots(A, B)), ['->logo:baru', 'cam>-:keluar']);
+});
+
+test('sameView: isi sama = crop tumpang tindih atau gambar sama; selain itu crossfade', () => {
+  const c = (x, o = {}) => ({ image: '', crop: { x, y: 0, w: 100, h: 60 }, ...o });
+  assert.equal(sameView(c(0), c(50)), true);
+  assert.equal(sameView(c(0), c(300)), false); // nama sama, kamera beda
+  assert.equal(sameView(c(0, { image: '/u/a.png' }), c(900, { image: '/u/a.png' })), true);
+  assert.equal(sameView(c(0, { image: '/u/a.png' }), c(0, { image: '/u/b.png' })), false);
 });
