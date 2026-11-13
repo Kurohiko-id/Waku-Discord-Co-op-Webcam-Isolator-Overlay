@@ -35,8 +35,20 @@ Waku memotong kamera teman co-op dari jendela Discord, menyusunnya jadi satu tam
 ## Kebutuhan
 
 - Windows 10 atau 11 (64-bit)
-- Aplikasi Discord desktop
+- Aplikasi Discord desktop (atau aplikasi lain, lihat di bawah)
 - OBS Studio
+
+## Aplikasi lain
+
+Waku dibuat untuk Discord, tapi capture dan crop bisa dipakai di jendela apa pun yang menampilkan webcam, termasuk tab browser.
+
+| Aplikasi | Capture dan crop | Deteksi bicara |
+|---|---|---|
+| Discord | Ya | Official dan Manual |
+| Fluxer | Ya | Manual seharusnya jalan (Fluxer juga memakai garis hijau), belum dites di panggilan sungguhan |
+| Aplikasi lain (Zoom, Teams, Google Meet, ...) | Ya | Manual hanya jika aplikasinya memberi garis **hijau** di sekitar orang yang bicara |
+
+Deteksi Official memakai API Discord, jadi hanya untuk Discord. Kalau aplikasinya menandai pembicara dengan warna lain, atur deteksi frame itu ke **Nonaktif**.
 
 ## Instal
 

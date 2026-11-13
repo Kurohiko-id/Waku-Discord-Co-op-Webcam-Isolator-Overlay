@@ -357,8 +357,11 @@ body:not(.alt) .c:is(.n, .s, .e, .w)::after { display: none; }
 .dock { display: flex; align-items: stretch; gap: 14px; padding: 10px 16px; background: var(--surface); border-top: 1px solid var(--line); }
 .quick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; }
 .quick small { font-size: 12.5px; font-weight: 600; color: var(--ink2); flex: none; }
-#quickPresets { display: flex; gap: 8px; overflow-x: auto; padding: 2px; min-width: 0; }
-#quickPresets button { flex: none; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0; min-height: 44px; padding: 5px 14px; font-weight: 600; }
+#quickPresets { display: flex; gap: 8px; overflow-x: scroll; scrollbar-width: thin; padding: 2px; min-width: 0; } /* tempat scrollbar selalu ada: tinggi bar (dan ukuran kanvas) tidak berubah saat daftar mulai/berhenti bisa digulir */
+#quickPresets button { flex: none; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 116px; min-height: 44px; padding: 8px 9px 6px; font-weight: 600; text-align: left; }
+#quickPresets .pthumb { width: 96px; height: 54px; }
+.qp .tx { flex: 1; display: flex; flex-direction: column; min-width: 0; max-width: 100%; }
+.qp .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #quickPresets button small { font: 400 11.5px var(--font); color: var(--ink3); }
 #quickPresets button:hover { background: var(--accent-soft); border-color: var(--accent-line); }
 #quickPresets .qp { position: relative; flex: none; display: flex; }
@@ -367,9 +370,10 @@ body:not(.alt) .c:is(.n, .s, .e, .w)::after { display: none; }
 #quickPresets .qp:hover .pin, #quickPresets .pin:focus-visible { opacity: 1; }
 #quickPresets .pin:hover { background: var(--surface-3); color: var(--ink); }
 #quickPresets .pin.on { opacity: 1; color: var(--accent); } /* disematkan: ikon selalu terlihat */
+#quickPresets .pin { top: auto; bottom: 5px; right: 5px; } /* di samping nama, tidak menutupi gambar susunan */
 #quickPresets .pin.on svg { fill: currentColor; }
 #quickPresets .qp > button:first-child { padding-right: 30px; } /* ruang untuk ikon pin */
-#quickPresets .none { color: var(--ink3); font-size: 12.5px; }
+#quickPresets .none { align-self: center; color: var(--ink3); font-size: 12.5px; }
 
 /* ---------- bantuan ---------- */
 .help { position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 92vw); z-index: 30; background: var(--surface); border-left: 1px solid var(--line-2); box-shadow: -24px 0 48px #00000070; padding: 18px 22px; transform: translateX(110%); transition: transform .28s var(--ease); overflow: auto; }
@@ -456,13 +460,23 @@ dialog::backdrop { background: #05070acc; }
 #safeList .btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 #morePresets { width: 260px; }
 #moreList { display: grid; gap: 6px; margin-bottom: 8px; max-height: 50vh; overflow: auto; }
-#moreList .qp { position: relative; display: flex; }
-#moreList .qp > button:first-child { flex: 1; display: flex; flex-direction: column; align-items: flex-start; padding: 6px 34px 6px 12px; min-height: 40px; font-weight: 600; text-align: left; }
+#moreList .qp { position: relative; display: flex; min-width: 0; }
+#moreList .qp > button:first-child { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 6px 34px 6px 8px; min-height: 40px; font-weight: 600; text-align: left; }
 #moreList .qp small { font: 400 11.5px var(--font); color: var(--ink3); }
 #moreList .pin { position: absolute; top: 50%; right: 6px; translate: 0 -50%; display: grid; place-items: center; width: 24px; height: 24px; min-height: 0; padding: 0; border: 0; background: none; color: var(--ink3); }
 #moreList .pin svg { width: 14px; height: 14px; }
 #moreList .pin:hover { color: var(--accent); }
-#quickPresets #moreBtn { flex: none; flex-direction: row; align-items: center; min-width: 0; }
+.qhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; }
+/* Cari + Lainnya: satu pasang, tinggi dan permukaan sama dengan kartu preset di bawahnya */
+.qtools { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.qsearch { position: relative; display: flex; align-items: center; min-width: 0; }
+.qsearch svg { position: absolute; left: 9px; width: 14px; height: 14px; color: var(--ink3); pointer-events: none; }
+#qSearch { width: 200px; min-width: 0; height: 30px; min-height: 0; margin: 0; padding: 0 10px 0 29px; background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 5px; color: var(--ink); font: 400 12.5px var(--font); }
+#qSearch::placeholder { color: var(--ink3); }
+#qSearch:focus { outline: none; border-color: var(--accent-line); background: var(--surface); }
+.qsearch:focus-within svg { color: var(--accent); }
+#moreBtn { height: 30px; min-height: 0; padding: 0 12px; background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 5px; font: 700 12px var(--head); letter-spacing: .04em; text-transform: uppercase; }
+#moreBtn:hover { background: var(--accent-soft); border-color: var(--accent-line); }
 #quickCfg, #safeCfg, #morePresets, #pSaveDlg, #pMenu { position: fixed; inset: auto; margin: 0; width: 300px; max-height: calc(100vh - 24px); overflow: auto; padding: 14px 16px; color: var(--ink); background: var(--surface); border: 1px solid var(--line-2); border-radius: 8px; box-shadow: 0 16px 40px #00000088; }
 :is(#quickCfg, #safeCfg, #morePresets, #pSaveDlg) h3 { font: 700 12.5px var(--head); letter-spacing: .06em; text-transform: uppercase; color: var(--ink2); margin: 0 0 6px; }
 #quickCfg h3 ~ h3, #qKeysRow h3 { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }

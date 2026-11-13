@@ -35,8 +35,20 @@ Waku crops your co-op friends' cameras out of the Discord window, arranges them 
 ## Requirements
 
 - Windows 10 or 11 (64-bit)
-- Discord desktop app
+- Discord desktop app (or another app, see below)
 - OBS Studio
+
+## Other apps
+
+Waku is made for Discord, but capture and cropping work on any window that shows webcams, including a browser tab.
+
+| App | Capture and crop | Speaking detection |
+|---|---|---|
+| Discord | Yes | Official and Manual |
+| Fluxer | Yes | Manual should work (Fluxer also draws a green outline), not tested in a real call yet |
+| Other apps (Zoom, Teams, Google Meet, ...) | Yes | Manual only if the app draws a **green** outline around whoever is talking |
+
+Official detection uses Discord's API, so it's Discord only. If an app marks speakers with another color, set that frame's detection to **Off**.
 
 ## Install
 

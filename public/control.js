@@ -16,6 +16,7 @@ import { Stat, createLogger, watchIce } from '/shared/log.js';
 import { iceDone } from '/shared/rtc.js';
 import { createPresetIoDialogs } from '/preset-io-dialog.js';
 import { initUpdates } from '/update-dialog.js';
+import { fuzzyMatch } from '/shared/fuzzy.js';
 import { startI18n, setLang, getLang, original, tr } from '/shared/i18n.js';
 
 const $ = id => document.getElementById(id);
@@ -339,13 +340,15 @@ function presetRow(p, temp) {
   return row;
 }
 let shownLists = []; // daftar preset/Temp yang sedang tampil: render() tidak membangunnya ulang bila sama
+// Preset cocok dengan pencarian (nama preset atau nama orang di dalamnya), boleh typo.
+const presetHit = (p, q) => !q || [p.name, ...presetPeople(p)].some(x => fuzzyMatch(q, x));
 function renderPresets() {
   shownLists = [layout.presets, layout.temp];
   reportDeck();
   const temp = pTab === 'temp';
   for (const b of $('pTabs').children) b.setAttribute('aria-pressed', String(b.dataset.tab === pTab));
   const q = $('pSearch').value.trim().toLowerCase();
-  const list = (temp ? layout.temp : layout.presets).filter(p => !q || [p.name, ...presetPeople(p)].some(x => x.toLowerCase().includes(q)));
+  const list = (temp ? layout.temp : layout.presets).filter(p => presetHit(p, q));
   const rows = list.map(p => presetRow(p, temp));
   if (!rows.length) {
     const e = document.createElement('p');
@@ -360,7 +363,9 @@ function renderPresets() {
   const none = document.createElement('span');
   none.className = 'none';
   none.textContent = 'Belum ada preset';
-  $('quickPresets').replaceChildren(...(pinned.length ? pinned.map(quickPreset) : layout.presets.length ? [] : [none]), $('moreBtn')); // Lainnya tepat setelah tombol yang disematkan
+  const qq = $('qSearch').value.trim(), shown = qq ? order.filter(p => presetHit(p, qq)) : pinned; // mencari: semua preset yang cocok, disematkan atau tidak
+  if (qq && !shown.length) none.textContent = 'Tidak ada yang cocok.';
+  $('quickPresets').replaceChildren(...(shown.length ? shown.map(quickPreset) : layout.presets.length && !qq ? [] : [none])); // Lainnya di kanan judul: tetap terlihat walau daftar di-scroll
   $('moreBtn').hidden = !rest.length;
   $('moreBtn').textContent = pinned.length ? 'Lainnya ▾' : 'Pilih preset ▾';
   $('moreList').replaceChildren(...rest.map(quickPreset));
@@ -420,7 +425,13 @@ function quickPreset(p) {
   b.type = 'button';
   const n = document.createElement('small');
   n.textContent = shownSlots(p.slots).length + ' frame';
-  b.append(p.name || 'Tanpa nama', n);
+  const name = document.createElement('span');
+  name.className = 'nm';
+  name.textContent = p.name || 'Tanpa nama';
+  const txt = document.createElement('span');
+  txt.className = 'tx';
+  txt.append(name, n);
+  b.append(presetThumb(p.slots), txt); // bentuk susunannya terlihat tanpa membaca nama
   b.title = 'Terapkan preset (' + n.textContent + ')';
   b.onclick = () => { $('morePresets').hidePopover(); applyPreset(p); };
   const pin = document.createElement('button');
@@ -451,11 +462,30 @@ function movePreset(from, to) {
   commit();
   renderPresets();
 }
-// Menu Lainnya muncul di atas tombolnya (bar preset ada di bawah layar).
+// Selama mencari, tinggi bar dikunci: hasil sedikit atau kosong tidak boleh membuat kanvas di atasnya ikut membesar.
+function searchPresets() {
+  const bar = $('quickPresets'), on = !!$('qSearch').value.trim();
+  if (on && !bar.style.minHeight) bar.style.minHeight = Math.max(bar.getBoundingClientRect().height, 114) + 'px'; // pecahan persis; 114 = tinggi satu kartu
+  if (!on) bar.style.minHeight = '';
+  renderPresets();
+  bar.scrollLeft = 0;
+}
+$('qSearch').oninput = searchPresets;
+$('qSearch').onkeydown = e => { if (e.key === 'Escape' && e.target.value) { e.stopPropagation(); e.target.value = ''; searchPresets(); } }; // Esc cukup mengosongkan pencarian, pilihan frame tetap
+// Roda mouse biasa (naik/turun) menggulir daftar preset ke samping; di ujung daftar halaman tetap bergulir.
+$('quickPresets').addEventListener('wheel', e => {
+  const el = e.currentTarget, d = e.deltaY;
+  if (!d || e.shiftKey || Math.abs(e.deltaX) > Math.abs(d)) return; // touchpad geser samping / Shift+roda: bawaan browser
+  const max = el.scrollWidth - el.clientWidth;
+  if ((d < 0 && el.scrollLeft <= 0) || (d > 0 && el.scrollLeft >= max - 1)) return;
+  e.preventDefault();
+  el.scrollLeft += d;
+}, { passive: false });
+// Menu Lainnya muncul di atas tombolnya (kanan judul bar preset, di bawah layar).
 $('morePresets').addEventListener('beforetoggle', e => {
   if (e.newState !== 'open') return;
-  const r = $('moreBtn').getBoundingClientRect();
-  Object.assign($('morePresets').style, { left: r.left + 'px', bottom: innerHeight - r.top + 6 + 'px' });
+  const r = $('moreBtn').getBoundingClientRect(), w = parseFloat(getComputedStyle($('morePresets')).width) || 300; // belum tampil: lebar dari CSS
+  Object.assign($('morePresets').style, { left: Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px', bottom: innerHeight - r.top + 6 + 'px' }); // rata kanan dengan tombolnya, tidak keluar jendela
 });
 // Gambar unggahan yang filenya sudah tidak ada di server (mis. folder data dihapus manual). Gagal menghubungi server = anggap ada.
 async function missingImages(slots) {
@@ -598,7 +628,7 @@ addEventListener('keyup', e => { if (e.key === 'Alt') e.preventDefault(); altMod
 addEventListener('blur', () => document.body.classList.remove('alt'));
 document.addEventListener('keydown', e => {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || cropDlg.isOpen()) return;
-  if (e.target.matches?.('input:not([type]), input[type=text], input[type=number], textarea, [contenteditable]')) return; // undo teks bawaan
+  if (e.target.matches?.('input:not([type]), input[type=text], input[type=search], input[type=number], textarea, [contenteditable]')) return; // undo teks bawaan (juga kotak cari preset)
   const k = e.key.toLowerCase();
   if (k === 'z' && !e.shiftKey) { e.preventDefault(); stepHistory(undoStack, redoStack); }
   else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); stepHistory(redoStack, undoStack); }
